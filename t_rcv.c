@@ -63,31 +63,36 @@ int main()
         num = select( FD_SETSIZE, &read_mask, &write_mask, &excep_mask, NULL);
         if (num > 0) {
             if ( FD_ISSET(s,&read_mask) ) {
+                printf("DBG: accepting...\n");
                 recv_s[i] = accept(s, 0, 0) ;
                 FD_SET(recv_s[i], &mask);
                 gettimeofday(&receive_start, NULL);
                 gettimeofday(&report_start, NULL);
                 valid[i] = 1;
                 i++;
+                printf("DBG: accepted...\n");
             }
             for(j=0; j<i ; j++)
             {   if (valid[j])    
                 if ( FD_ISSET(recv_s[j],&read_mask) ) {
+                    printf("DBG: receiving...\n");
                     n = recv(recv_s[j], mess_buf, BUF_SIZE, 0 );
+                    printf("DBG: received %d...\n", n);
                     if( n > 0) {
                         neto_len = mess_len - sizeof(mess_len);
                         recv(recv_s[j], mess_buf, neto_len, 0 );
                         mess_buf[neto_len] = '\0';
-                    
+                        printf("DBG: received, writing...\n");
                         nwritten = fwrite(mess_buf, 1, n, fw);
                         if (nwritten < n) {
-                            printf("An error occurred...\n");
+                            printf("An error occurred in writing the file...\n");
                             exit(0);
                         }
                         received_bytes += nwritten;
                         report_received_bytes += nwritten;
                         if(report_received_bytes >= 100000000)
                         {
+                            printf("DBG: reporting...\n");
                             gettimeofday(&report_end, NULL);
                             receive_duration = (report_end.tv_sec - report_start.tv_sec)*1000000 + (report_end.tv_usec - report_start.tv_usec);
                             
