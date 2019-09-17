@@ -73,17 +73,81 @@ int send_reply(int type, char* payload, int size)
 
 int send_feedback_message()
 {
-    if (session.status == INORDER_RECEIVING)
+    int i, nwritten, nack_seq, reached_invalid = 0, j=0;
+    char msg[1400], amsg[10], nmsg[10];
+    for(i=session.window_start_pointer; i< WINDOW_SIZE;i++)
     {
-        char msg[1400];
-        sprintf(msg, "A%d", session.seq_number_to_receive);
-        printf("DBG: receiving in order, so sending an ack for %d (%s)\n", session.seq_number_to_receive, msg);
-        send_reply(3, msg, strlen(msg));
+        if(session.slots[i].valid)
+        {
+            nwritten = fwrite(session.slots[i].data, 1, session.slots[i].size, session.file.fw);
+            if (nwritten < session.slots[i].size) {
+                printf("An error occurred when writing to file...\n");
+                exit(0);
+            }
+            session.slots[i].valid = 0;
+            session.window_start_pointer++;
+            if(session.window_start_pointer >= WINDOW_SIZE)
+                session.window_start_pointer = 0;
+            session.seq_number_to_receive++;
+            if(session.seq_number_to_receive >= 2*WINDOW_SIZE)
+                session.seq_number_to_receive = 0;
+        }
+        else{
+            reached_invalid = 1;
+            break;
+        }
     }
-    else
+    for(i=0; i< session.window_start_pointer && !reached_invalid;i++)
     {
+        if(session.slots[i].valid)
+        {
+            nwritten = fwrite(session.slots[i].data, 1, session.slots[i].size, session.file.fw);
+            if (nwritten < session.slots[i].size) {
+                printf("An error occurred when writing to file...\n");
+                exit(0);
+            }
+            session.slots[i].valid = 0;
+            session.window_start_pointer++;
+            if(session.window_start_pointer >= WINDOW_SIZE)
+                session.window_start_pointer = 0;
+            session.seq_number_to_receive++;
+            if(session.seq_number_to_receive >= 2*WINDOW_SIZE)
+                session.seq_number_to_receive = 0;
+        }
+        else{
+            reached_invalid = 1;
+            break;
+        }
+    }
+    sprintf(amsg, "A%d,", session.seq_number_to_receive);
+    printf("DBG: receiving in order, so sending an ack for %d (%s)\n", session.seq_number_to_receive, msg);
+    strcpy(msg, amsg);
+    if(session.status == OUTOFORDER_RECEIVING)
+    {
+        for(i=session.window_start_pointer; i< WINDOW_SIZE;i++)
+        {
+            if(!session.slots[i].valid)
+            {
+                nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
+                sprintf(nmsg, "N%d,", nack_seq);
+                strcat(msg,nmsg);
+            }
+            j++;
+        }
+        for(i=0; i< session.window_start_pointer;i++)
+        {
+            if(!session.slots[i].valid)
+            {
+                nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
+                sprintf(nmsg, "N%d,", nack_seq);
+                strcat(msg,nmsg);
+            }
+            j++;
+        }
+    }
 
-    }
+    send_reply(3, msg, strlen(msg));
+    
     return 0;
 }
 
@@ -124,16 +188,15 @@ int handle_file_send_request(int size, char* buffer, struct sockaddr_in connecti
     return 0;
 }
 
-void flush_to_file()
+int handle_finalize(char *buffer)
 {
+    unsigned short seq_num = buffer[3];
+    if (session.seq_number_to_receive == seq_num)
+    {
+        fclose(session.file.fw);
+        session.status = WAITING;
+    }
 
-}
-
-int handle_finalize()
-{
-    flush_to_file();
-    fclose(session.file.fw);
-    session.status = WAITING;
     send_feedback_message();
     return 0;
 }
@@ -233,7 +296,7 @@ int parse(char* buffer, int length, struct sockaddr_in connection)
             break;
         case 1:
             printf("DBG: message type is finalize\n");
-            handle_finalize();
+            handle_finalize(buffer);
             break;
         case 2:
             printf("DBG: message type is data\n");
@@ -289,8 +352,8 @@ int main()
     for(;;)
     {
         read_mask = mask;
-        timeout.tv_sec = 10;
-        timeout.tv_usec = 0;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 10000;
         num = select( FD_SETSIZE, &read_mask, &write_mask, &excep_mask, &timeout);
         if (num > 0) {
             if ( FD_ISSET( sr, &read_mask) ) {
@@ -309,9 +372,10 @@ int main()
                                 mess_buf );
                 parse(mess_buf, bytes, from_addr);
             }
-        } else {
-            printf(".");
-            fflush(0);
+        } else {    // timeout: send feedback
+            send_feedback_message();
+            // printf(".");
+            // fflush(0);
         }
     }
     return 0;
