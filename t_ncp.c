@@ -7,17 +7,15 @@ int main(int argc, char **argv)
     struct sockaddr_in host;
     struct hostent     h_ent, *p_h_ent;
 
-    char               *c;
-
     int                s;
     int                ret;
-    int                mess_len;
-    char               mess_buf[MAX_MESS_LEN];
-    char               *neto_mess_ptr = &mess_buf[sizeof(mess_len)]; 
+
+    struct timeval     send_start, send_end, report_start, report_end;
+    unsigned long      send_duration, sent_bytes = 0, report_sent_bytes = 0;
 
     FILE *fr; /* Pointer to source file, which we read */
     char buf[BUF_SIZE];
-    int nread, nwritten;
+    int nread = 0;
 
   if(argc != 4) {
     printf("Usage: t_ncp <source_file> <destination_file> <comp_name>\n");
@@ -51,6 +49,10 @@ int main(int argc, char **argv)
     memcpy( &host.sin_addr, h_ent.h_addr_list[0],  sizeof(host.sin_addr) );
 
     ret = connect(s, (struct sockaddr *)&host, sizeof(host) ); /* Connect! */
+
+    gettimeofday(&send_start, NULL);
+    gettimeofday(&report_start, NULL);
+
     if( ret < 0)
     {
         perror( "Net_client: could not connect to server"); 
@@ -70,6 +72,17 @@ int main(int argc, char **argv)
                 perror( "Net_client: error in writing");
                 exit(1);
             }
+            sent_bytes += nread;
+            report_sent_bytes += nread;
+            if(report_sent_bytes >= 100000000)
+            {
+                gettimeofday(&report_end, NULL);
+                send_duration = (report_end.tv_sec - report_start.tv_sec)*1000000 + (report_end.tv_usec - report_start.tv_usec);
+                printf("Reporting: Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", report_sent_bytes, send_duration, (report_sent_bytes*8)/send_duration);
+                gettimeofday(&report_start, NULL);
+                report_sent_bytes = 0;
+
+            }
         }
     
         /* fread returns a short count either at EOF or when an error occurred */
@@ -78,6 +91,9 @@ int main(int argc, char **argv)
             /* Did we reach the EOF? */
             if(feof(fr)) {
                 printf("Finished writing.\n");
+                gettimeofday(&send_end, NULL);
+                        send_duration = (send_end.tv_sec - send_start.tv_sec)*1000000 + (send_end.tv_usec - send_start.tv_usec);
+                        printf("Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", sent_bytes, send_duration, (sent_bytes*8)/send_duration);
                 break;
             }
             else {

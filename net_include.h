@@ -12,7 +12,10 @@
 
 #include <errno.h>
 
-#define PORT	     5555
+#include <time.h>
+#include <sys/time.h>
+
+#define PORT	     10350
 
 #define MAX_MESS_LEN 1400
 
