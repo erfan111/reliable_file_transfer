@@ -63,6 +63,7 @@ int send_packet(int type, char * payload, int size)
     message[1] = first;
     message[2] = second;
     memcpy( message + 3, payload, size );
+    usleep(100);
     ret = sendto( session.socket, message, size+3, 0, 
                 (struct sockaddr *)&session.connection, sizeof(session.connection) );
     printf("DBG: sent %d bytes\n", ret);

@@ -41,6 +41,7 @@ typedef struct Session_t {
     struct timeval recent_progress_start_timestamp, recent_progress_end_timestamp;
     unsigned long recent_progress_bytes_receive;
     int socket;
+    int last_valid_index;
 } Session;
 
 Session session;
@@ -85,6 +86,21 @@ int send_feedback_message()
                 printf("An error occurred when writing to file...\n");
                 exit(0);
             }
+
+            session.file.total_bytes_receive += nwritten;
+            session.recent_progress_bytes_receive += nwritten;
+            if(session.recent_progress_bytes_receive >= 100000000)
+            {
+                unsigned long receive_duration;
+                // printf("DBG: reporting...\n");
+                gettimeofday(&session.recent_progress_end_timestamp, NULL);
+                receive_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
+                
+                printf("Reporting: Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", session.recent_progress_bytes_receive, receive_duration, (session.recent_progress_bytes_receive*8)/receive_duration);
+                gettimeofday(&session.recent_progress_start_timestamp, NULL);
+                session.recent_progress_bytes_receive = 0;
+            }
+
             session.slots[i].valid = 0;
             session.window_start_pointer++;
             if(session.window_start_pointer >= WINDOW_SIZE)
@@ -139,27 +155,44 @@ int send_feedback_message()
     strcpy(msg, amsg);
     if(session.status == OUTOFORDER_RECEIVING)
     {
-        for(i=session.window_start_pointer; i< WINDOW_SIZE;i++)
+
+        if(session.window_start_pointer  <= session.last_valid_index)
         {
-            if(!session.slots[i].valid)
+            for(i=session.window_start_pointer; i<= session.last_valid_index;i++)
             {
-                nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
-                printf("DBG: also receiving out of order, so sending nack for %d\n", nack_seq);
-                sprintf(nmsg, "N%d,", nack_seq);
-                strcat(msg,nmsg);
+                if(!session.slots[i].valid)
+                {
+                    nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
+                    printf("DBG: also receiving out of order, so sending nack for %d\n", nack_seq);
+                    sprintf(nmsg, "N%d,", nack_seq);
+                    strcat(msg,nmsg);
+                }
+                j++;
             }
-            j++;
         }
-        for(i=0; i< session.window_start_pointer;i++)
-        {
-            if(!session.slots[i].valid)
+        else {
+            for(i=session.window_start_pointer; i< WINDOW_SIZE;i++)
             {
-                nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
-                printf("DBG: also receiving out of order, so sending nack for %d\n", nack_seq);
-                sprintf(nmsg, "N%d,", nack_seq);
-                strcat(msg,nmsg);
+                if(!session.slots[i].valid)
+                {
+                    nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
+                    printf("DBG: also receiving out of order, so sending nack for %d\n", nack_seq);
+                    sprintf(nmsg, "N%d,", nack_seq);
+                    strcat(msg,nmsg);
+                }
+                j++;
             }
-            j++;
+            for(i=0; i<= session.last_valid_index;i++)
+            {
+                if(!session.slots[i].valid)
+                {
+                    nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
+                    printf("DBG: also receiving out of order, so sending nack for %d\n", nack_seq);
+                    sprintf(nmsg, "N%d,", nack_seq);
+                    strcat(msg,nmsg);
+                }
+                j++;
+            }
         }
         
     }
@@ -236,45 +269,34 @@ void insert_into_window(int index, char*buffer, int size)
     session.slots[index].valid = 1;
 }
 
-void check_order(int from, int current)
+void check_order()
 {
     printf("DBG: checking order\n");
-    int i, ordered = 1;
-    if(current < session.window_start_pointer)
+    int i, saw_invalid = 0;
+    session.status = INORDER_RECEIVING;
+    for(i=session.window_start_pointer; i<WINDOW_SIZE;i++)
     {
-        for(i=session.window_start_pointer; i<WINDOW_SIZE;i++)
+        if(session.slots[i].valid == 0)
+            saw_invalid = 1;
+        else
         {
-            if(session.slots[i].valid == 0)
-            {
-                ordered = 0;
-                break;
-            }
-        }
-        for(i=0; i<current && ordered;i++)
-        {
-            if(session.slots[i].valid == 0)
-            {
-                ordered = 0;
-                break;
-            }
-        }
-    }
-    else
-    {
-        for(i=session.window_start_pointer; i<WINDOW_SIZE;i++)
-        {
-            if(session.slots[i].valid == 0)
-            {
+            session.last_valid_index = i;
+            if(saw_invalid)
                 session.status = OUTOFORDER_RECEIVING;
-                break;
-            }
         }
     }
-    printf("DBG: checking order result = %d\n", ordered);
-    if(ordered)
-        session.status = INORDER_RECEIVING;
-    else
-        session.status = OUTOFORDER_RECEIVING;
+    for(i=0; i < session.window_start_pointer;i++)
+    {
+        if(session.slots[i].valid == 0)
+            saw_invalid = 1;
+        else
+        {
+            session.last_valid_index = i;
+            if(saw_invalid)
+                session.status = OUTOFORDER_RECEIVING;
+        }
+    }
+    printf("DBG: checking order result = %d\n", session.status);
 
 }
 
@@ -318,7 +340,7 @@ int handle_file_receive(int size, char* buffer)
             printf("DBG: out of window sequence number\n");
 
     }
-    
+    check_order();
     return 0;
 }
 
