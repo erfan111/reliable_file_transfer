@@ -28,7 +28,7 @@ typedef struct file_to_transmit_t {
     int filename_length;
     int file_size;
     int file_offset_to_receive;
-    int total_bytes_receive;
+    unsigned long total_bytes_receive;
 } file_to_transmit;
 
 typedef struct Session_t {
@@ -38,9 +38,9 @@ typedef struct Session_t {
     int window_start_pointer;
     enum STATUS status;
     file_to_transmit file;
-    struct timeval receive_start;
-    struct timeval recent_progress_timestamp;
-    int recent_progress_bytes_receive;
+    struct timeval receive_start, receive_end;
+    struct timeval recent_progress_start_timestamp, recent_progress_end_timestamp;
+    unsigned long recent_progress_bytes_receive;
     int socket;
 } Session;
 
@@ -106,6 +106,20 @@ int send_feedback_message()
                 printf("An error occurred when writing to file...\n");
                 exit(0);
             }
+            session.file.total_bytes_receive += nwritten;
+            session.recent_progress_bytes_receive += nwritten;
+            if(session.recent_progress_bytes_receive >= 100000000)
+            {
+                unsigned long receive_duration;
+                // printf("DBG: reporting...\n");
+                gettimeofday(&session.recent_progress_end_timestamp, NULL);
+                receive_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
+                
+                printf("Reporting: Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", session.recent_progress_bytes_receive, receive_duration, (session.recent_progress_bytes_receive*8)/receive_duration);
+                gettimeofday(&session.recent_progress_start_timestamp, NULL);
+                session.recent_progress_bytes_receive = 0;
+            }
+
             session.slots[i].valid = 0;
             session.window_start_pointer++;
             if(session.window_start_pointer >= WINDOW_SIZE)
@@ -151,6 +165,12 @@ int send_feedback_message()
     return 0;
 }
 
+int send_finalize_message()
+{
+    send_reply(1, NULL, 0);
+    return 0;
+}
+
 char* get_payload(char *buffer, int size)
 {
     char *payload;
@@ -190,14 +210,15 @@ int handle_file_send_request(int size, char* buffer, struct sockaddr_in connecti
 
 int handle_finalize(char *buffer)
 {
-    unsigned short seq_num = buffer[3];
-    if (session.seq_number_to_receive == seq_num)
-    {
-        fclose(session.file.fw);
-        session.status = WAITING;
-    }
+    unsigned long receive_duration;
+    // unsigned short seq_num = buffer[3];
+    fclose(session.file.fw);
+    session.status = WAITING;
+    gettimeofday(&session.receive_end, NULL);
+    receive_duration = (session.receive_end.tv_sec - session.receive_start.tv_sec)*1000000 + (session.receive_end.tv_usec - session.receive_start.tv_usec);
+    printf("Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", session.file.total_bytes_receive, receive_duration, (session.file.total_bytes_receive*8)/receive_duration);
 
-    send_feedback_message();
+    send_finalize_message();
     return 0;
 }
 
@@ -373,7 +394,8 @@ int main()
                 parse(mess_buf, bytes, from_addr);
             }
         } else {    // timeout: send feedback
-            send_feedback_message();
+            if(session.status != WAITING)
+                send_feedback_message();
             // printf(".");
             // fflush(0);
         }
