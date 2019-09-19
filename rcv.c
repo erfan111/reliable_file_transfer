@@ -15,7 +15,7 @@ enum STATUS {
 };
 
 typedef struct Window_slot_t {
-    char* data;
+    char data[1395];
     int size;
     int valid;
     int nack_sent;
@@ -231,8 +231,8 @@ int handle_finalize(char *buffer)
 
 void insert_into_window(int index, char*buffer, int size)
 {
-    printf("DBG: inserting into array %d\n", index);
-    memcpy( session.slots[index].data, &buffer[5], size);
+    printf("DBG: inserting into array index = %d, size = %d\n", index, size);
+    memcpy( session.slots[index].data, buffer + 5, size);
     session.slots[index].size = size;
     session.slots[index].valid = 1;
 }
