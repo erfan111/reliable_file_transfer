@@ -306,7 +306,10 @@ void check_order()
 
 int handle_file_receive(int size, char* buffer)
 {
-    unsigned short seq_num = ((buffer[3] & 0xff) << 8) | (buffer[4] & 0xff);
+    u_int16_t seq_num;
+    char sn_buffer[2];
+    memcpy(sn_buffer, buffer + 3, 2);
+    seq_num = *((u_int16_t*)sn_buffer);
     printf("DBG: handling file receive, seq_num received is %u\n", seq_num);
     if (session.seq_number_to_receive > WINDOW_SIZE)    //e.g.:   0 ] 1  2  3  4 [ 5  6  7 
     {
