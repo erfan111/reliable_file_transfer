@@ -32,7 +32,7 @@ typedef struct file_to_transmit_t {
     int filename_length;
     int file_size;
     int file_offset_to_send;
-    int total_bytes_sent;
+    unsigned long total_bytes_sent;
 } file_to_transmit;
 
 typedef struct Session_t {
@@ -44,7 +44,7 @@ typedef struct Session_t {
     file_to_transmit file;
     struct timeval send_start, send_end;
     struct timeval recent_progress_start_timestamp, recent_progress_end_timestamp;
-    int recent_progress_bytes_sent;
+    unsigned long recent_progress_bytes_sent;
     int socket;
     int loss_rate;
     char *dest_file_name;
@@ -78,22 +78,24 @@ int send_packet(int type, char * payload, int size)
 int send_initialize_request()
 {
     send_packet(0, session.dest_file_name, session.dest_file_name_size);
+    return 0;
 }
 
 int send_poll_message()
 {
     send_packet(4, NULL, 0);
+    return 0;
 }
 
 int send_finalize_message()
 {
     char message[2];
-    int ret;
     uint8_t second = session.seq_number_to_send & 0x000000ff;
     uint8_t first = (session.seq_number_to_send >> (8)) & 0x000000ff;
     message[1] = first;
     message[2] = second;
     send_packet(1, message, 2); // WARNING: DO NOT INCREMENT THIS WHEN WINDOW SENDING IS FINISHED!!!!!!!!
+    return 0;
 }
 
 int start_sending_the_file()
@@ -116,6 +118,7 @@ int start_sending_the_file()
         memcpy(buf + 2, session.slots[i].data, session.slots[i].size);
         send_packet(2, buf, session.slots[i].size+2);
     }
+    return 0;
 }
 
 int is_seqnum_in_window(int seq_number)
@@ -135,7 +138,6 @@ int is_seqnum_in_window(int seq_number)
 
 int handle_acknowledge(int sequence_number)
 {
-    int move_window;
     if(session.finalize_flag)
     {
         if((sequence_number == 0 && session.seq_number_to_send == 0) || sequence_number  == session.seq_number_to_send+1)
@@ -146,7 +148,7 @@ int handle_acknowledge(int sequence_number)
 
     if(is_seqnum_in_window(sequence_number))
     {
-        int i, nread;
+        int nread;
         uint8_t first, second;
         char buf[READ_BUF_SIZE+2];
         while(session.seq_number_to_send != sequence_number)
@@ -187,6 +189,7 @@ int handle_acknowledge(int sequence_number)
         }
         // session.slots[session.window_start_pointer]
     }
+    return 0;
 }
 
 int handle_nacknowledge(int sequence_number)
@@ -207,31 +210,32 @@ int handle_nacknowledge(int sequence_number)
         send_packet(2, buf, session.slots[index].size+2);
 
     }
+    return 0;
 }
 
 int parse_feedback_message(char * buffer, int size)
 {
     u_int16_t payload_size =  ((buffer[1] & 0xff) << 8) | (buffer[2] & 0xff);
-    int feedback_size, sequence_number;
+    int sequence_number;
     char payload[payload_size];
     memcpy(payload, buffer + 3, payload_size);
     char delimiter[] = ",";
     char *ptr = strtok(payload, delimiter);
     while(ptr != NULL)
     {
-        feedback_size = strlen(ptr);
-        if(ptr[0] == "A")
+        if(ptr[0] == 'A')
         {
             sscanf(ptr, "A%d", &sequence_number);
             handle_acknowledge(sequence_number);
         }
-        else if(ptr[0] == "N")
+        else if(ptr[0] == 'N')
         {
             sscanf(ptr, "N%d", &sequence_number);
             handle_nacknowledge(sequence_number);
         }
         ptr = strtok(NULL, delimiter);
     }
+    return 0;
 
 }
 
@@ -239,7 +243,6 @@ int parse(char *buffer, int size)
 {
     printf("DBG: parsing ...\n");
     int type = buffer[0];
-    int payload_size, file_name_size;
     if(type == 3)
     {
         switch (session.status)
@@ -281,10 +284,8 @@ int main(int argc, char **argv)
     struct hostent        h_ent;
     struct hostent        *p_h_ent;
     char                  host_name[NAME_LENGTH] = {'\0'};
-    char                  my_name[NAME_LENGTH] = {'\0'};
     int                   host_num;
-    int                   from_ip;
-    int                   ss,sr;
+    int                   sr;
     fd_set                mask;
     fd_set                read_mask, write_mask, excep_mask;
     int                   bytes;
@@ -331,6 +332,15 @@ int main(int argc, char **argv)
 
     session.socket = sr;
 
+    p_h_ent = gethostbyname(host_name);
+    if ( p_h_ent == NULL ) {
+        printf("Ucast: gethostbyname error.\n");
+        exit(1);
+    }
+
+    memcpy( &h_ent, p_h_ent, sizeof(h_ent));
+    memcpy( &host_num, h_ent.h_addr_list[0], sizeof(host_num) );
+
     send_addr.sin_family = AF_INET;
     send_addr.sin_addr.s_addr = host_num; 
     send_addr.sin_port = htons(PORT);
@@ -365,7 +375,6 @@ int main(int argc, char **argv)
                           (struct sockaddr *)&from_addr, 
                           &from_len );
                 mess_buf[bytes] = 0;
-                from_ip = from_addr.sin_addr.s_addr;
 
                 parse(mess_buf, bytes);
 
@@ -373,7 +382,7 @@ int main(int argc, char **argv)
                 bytes = read( 0, input_buf, sizeof(input_buf) );
                 input_buf[bytes] = 0;
                 printf( "There is an input: %s\n", input_buf );
-                sendto( ss, input_buf, strlen(input_buf), 0, 
+                sendto( sr, input_buf, strlen(input_buf), 0, 
                     (struct sockaddr *)&send_addr, sizeof(send_addr) );
             }
         } else {
