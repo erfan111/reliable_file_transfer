@@ -217,10 +217,14 @@ char* get_payload(char *buffer, int size)
     return payload;
 }
 
-int get_payload_size(char *buffer)
+u_int16_t get_payload_size(char *buffer)
 {
-    printf("payload size = %x -- %x \n", (unsigned char)buffer[1], (unsigned char)buffer[2]);
-    return (buffer[1] << 8) | buffer[2];
+    char psize[2];
+    int size;
+    memcpy(psize, buffer + 1, 2);
+    size = *((u_int16_t*)psize);
+    printf("payload size = %u \n", size);
+    return size;
 }
 
 int handle_file_send_request(int size, char* buffer, struct sockaddr_in connection)

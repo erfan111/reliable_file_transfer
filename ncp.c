@@ -60,8 +60,8 @@ int send_packet(int type, char * payload, int size)
     uint8_t second = size & 0x000000ff;
     uint8_t first = (size >> (8)) & 0x000000ff;
     message[0] = type & 0x000000ff;
-    message[1] = first;
-    message[2] = second;
+    message[2] = first;
+    message[1] = second;
     memcpy( message + 3, payload, size );
     if(size != 1397)
     {
