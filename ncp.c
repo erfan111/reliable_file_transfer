@@ -22,6 +22,7 @@ typedef struct Window_slot_t {
     int size;
     int valid;
     int is_last_packet;
+    int sent;
 } Window_slot;
 
 typedef struct file_to_transmit_t {
@@ -116,6 +117,7 @@ int start_sending_the_file()
     {
         session.slots[i].data = malloc(1395);
         session.slots[i].valid = 1;
+        session.slots[i].sent = 1;
         nread = fread(session.slots[i].data, 1, READ_BUF_SIZE, session.file.fr);
         session.slots[i].size = nread;
         second = i & 0x000000ff;
@@ -193,13 +195,17 @@ int handle_acknowledge(int sequence_number)
                     }
                         
                 }
-                second = session.seq_number_to_send & 0x000000ff;
-                first = (session.seq_number_to_send >> (8)) & 0x000000ff;
-                buf[0] = first;
-                buf[1] = second;
-                memcpy(buf + 2, session.slots[session.window_start_pointer].data, session.slots[session.window_start_pointer].size);
+                if(!session.slots[session.window_start_pointer].sent)
+                {
+                    second = session.seq_number_to_send & 0x000000ff;
+                    first = (session.seq_number_to_send >> (8)) & 0x000000ff;
+                    buf[0] = first;
+                    buf[1] = second;
+                    memcpy(buf + 2, session.slots[session.window_start_pointer].data, session.slots[session.window_start_pointer].size);
+                    
+                    send_packet(2, buf, session.slots[session.window_start_pointer].size+2);
+                }
                 
-                send_packet(2, buf, session.slots[session.window_start_pointer].size+2);
                 
                 session.window_start_pointer = (session.window_start_pointer+1) % WINDOW_SIZE;
             }
