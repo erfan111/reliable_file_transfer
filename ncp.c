@@ -7,7 +7,7 @@ int gethostname(char*,size_t);
 
 void PromptForHostName( char *my_name, char *host_name, size_t max_len ); 
 
-#define WINDOW_SIZE 3
+#define WINDOW_SIZE 100
 
 enum STATUS {
     WAITING,

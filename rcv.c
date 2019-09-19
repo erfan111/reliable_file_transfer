@@ -3,7 +3,6 @@
 #define NAME_LENGTH 80
 
 ////
-#define WINDOW_SIZE 3
 
 enum STATUS {
     WAITING,

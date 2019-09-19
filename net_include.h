@@ -19,3 +19,4 @@
 
 #define MAX_MESS_LEN 1400
 
+#define WINDOW_SIZE 100
