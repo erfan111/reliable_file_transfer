@@ -65,7 +65,7 @@ int send_packet(int type, char * payload, int size)
     memcpy( message + 3, payload, size );
     if(size != 1397)
     {
-        printf("payload = %c - %c \n", message[1], message[2]);
+        printf("payload = %x - %x \n", message[1], message[2]);
     }
     usleep(100);
     ret = sendto( session.socket, message, size+3, 0, 
