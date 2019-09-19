@@ -286,7 +286,7 @@ int handle_file_receive(int size, char* buffer)
     if (session.seq_number_to_receive > WINDOW_SIZE)    //e.g.:   0 ] 1  2  3  4 [ 5  6  7 
     {
         printf("DBG: our window is intercepting the 2W\n");
-        if(seq_num > session.seq_number_to_receive || seq_num < ((session.seq_number_to_receive + WINDOW_SIZE -1)% WINDOW_SIZE))
+        if(seq_num >= session.seq_number_to_receive || seq_num <= ((session.seq_number_to_receive + WINDOW_SIZE -1)% WINDOW_SIZE))
         {
             if(seq_num >= session.seq_number_to_receive)
             {
@@ -303,16 +303,20 @@ int handle_file_receive(int size, char* buffer)
                     insert_into_window(index%WINDOW_SIZE, buffer, size-2);
             }
         }
+        else
+            printf("DBG: out of window sequence number\n");
     }
     else
     {
         printf("DBG: our window is not intercepting the 2W\n");
-        if(seq_num > session.seq_number_to_receive && seq_num < (session.seq_number_to_receive + WINDOW_SIZE))
+        if(seq_num >= session.seq_number_to_receive && seq_num < (session.seq_number_to_receive + WINDOW_SIZE))
         {
             int index =  seq_num - session.seq_number_to_receive + session.window_start_pointer;
             if(!session.slots[index%WINDOW_SIZE].valid)
                 insert_into_window(index%WINDOW_SIZE, buffer, size-2);
         }
+        else
+            printf("DBG: out of window sequence number\n");
 
     }
     
