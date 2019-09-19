@@ -219,7 +219,7 @@ char* get_payload(char *buffer, int size)
 
 int get_payload_size(char *buffer)
 {
-    printf("payload size = %c -- %c \n", buffer[1], buffer[2]);
+    printf("payload size = %x -- %x \n", (unsigned char)buffer[1], (unsigned char)buffer[2]);
     return (buffer[1] << 8) | buffer[2];
 }
 
