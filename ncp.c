@@ -124,6 +124,19 @@ int start_sending_the_file()
         buf[1] = second;
         memcpy(buf + 2, session.slots[i].data, session.slots[i].size);
         send_packet(2, buf, session.slots[i].size+2);
+
+        session.file.total_bytes_sent += nread;
+        session.recent_progress_bytes_sent += nread;
+        if(session.recent_progress_bytes_sent >= 100000000)
+        {
+            long send_duration;
+            gettimeofday(&session.recent_progress_end_timestamp, NULL);
+            send_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
+            printf("Reporting: Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", session.recent_progress_bytes_sent, send_duration, (session.recent_progress_bytes_sent*8)/send_duration);
+            gettimeofday(&session.recent_progress_start_timestamp, NULL);
+            session.recent_progress_bytes_sent = 0;
+
+        }
     }
     return 0;
 }

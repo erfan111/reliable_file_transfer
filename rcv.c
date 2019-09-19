@@ -252,9 +252,9 @@ int handle_file_send_request(int size, char* buffer, struct sockaddr_in connecti
 
 int handle_finalize(char *buffer)
 {
-    
     unsigned long receive_duration;
     printf("DBG: handling finalize\n");
+    send_feedback_message();
     // unsigned short seq_num = buffer[3];
     fclose(session.file.fw);
     session.status = WAITING;
