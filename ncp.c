@@ -7,7 +7,6 @@ int gethostname(char*,size_t);
 
 void PromptForHostName( char *my_name, char *host_name, size_t max_len ); 
 
-#define WINDOW_SIZE 100
 
 enum STATUS {
     WAITING,
@@ -163,8 +162,10 @@ int handle_acknowledge(int sequence_number)
             session.slots[session.window_start_pointer].size = nread;
             session.slots[session.window_start_pointer].is_last_packet = 0;
             if(nread < READ_BUF_SIZE) {
+                printf("DBG: FIN read less than buffer size = %d \n", nread);
                 if(feof(session.file.fr))
                 {
+                    printf("DBG: FIN eof reached \n");
                     session.finalize_flag = 1;
                     session.slots[session.window_start_pointer].is_last_packet = 1;
                 }
