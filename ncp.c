@@ -77,12 +77,14 @@ int send_packet(int type, char * payload, int size)
 
 int send_initialize_request()
 {
+    printf("DBG: sending initialize message\n");
     send_packet(0, session.dest_file_name, session.dest_file_name_size);
     return 0;
 }
 
 int send_poll_message()
 {
+    printf("DBG: sending poll message\n");
     send_packet(4, NULL, 0);
     return 0;
 }
@@ -92,6 +94,7 @@ int send_finalize_message()
     char message[2];
     uint8_t second = session.seq_number_to_send & 0x000000ff;
     uint8_t first = (session.seq_number_to_send >> (8)) & 0x000000ff;
+    printf("DBG: sending finalize message\n");
     message[1] = first;
     message[2] = second;
     send_packet(1, message, 2); // WARNING: DO NOT INCREMENT THIS WHEN WINDOW SENDING IS FINISHED!!!!!!!!
@@ -104,7 +107,7 @@ int start_sending_the_file()
     char buf[READ_BUF_SIZE+2];
     uint8_t second;
     uint8_t first;
-    
+    printf("DBG: starting to send the file\n");
     for(i=0;i < WINDOW_SIZE;i++)
     {
         session.slots[i].data = malloc(1395);
@@ -133,11 +136,13 @@ int is_seqnum_in_window(int seq_number)
         if(seq_number >= session.seq_number_to_send || seq_number < session.seq_number_to_send + WINDOW_SIZE + 1)
             return 1;
     }
+    printf("DBG: seqnum received was not in window\n");
     return 0;
 }
 
 int handle_acknowledge(int sequence_number)
 {
+    printf("DBG: handling ack %d\n", sequence_number);
     if(session.finalize_flag)
     {
         if((sequence_number == 0 && session.seq_number_to_send == 0) || sequence_number  == session.seq_number_to_send+1)
@@ -194,6 +199,7 @@ int handle_acknowledge(int sequence_number)
 
 int handle_nacknowledge(int sequence_number)
 {
+    printf("DBG: handling nack %d\n", sequence_number);
     if(is_seqnum_in_window(sequence_number))
     {
         uint8_t first, second;
@@ -221,6 +227,7 @@ int parse_feedback_message(char * buffer, int size)
     memcpy(payload, buffer + 3, payload_size);
     char delimiter[] = ",";
     char *ptr = strtok(payload, delimiter);
+    printf("DBG: parsing the feedback message %d\n", sequence_number);
     while(ptr != NULL)
     {
         if(ptr[0] == 'A')
@@ -241,7 +248,7 @@ int parse_feedback_message(char * buffer, int size)
 
 int parse(char *buffer, int size)
 {
-    printf("DBG: parsing ...\n");
+    printf("DBG: parsing message...\n");
     int type = buffer[0];
     if(type == 3)
     {
@@ -386,6 +393,7 @@ int main(int argc, char **argv)
                     (struct sockaddr *)&send_addr, sizeof(send_addr) );
             }
         } else {
+            printf("DBG: timed out session.status =  %d\n", session.status);
             switch(session.status)
             {
                 case STARTING:

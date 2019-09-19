@@ -58,6 +58,7 @@ int send_reply(int type, char* payload, int size)
     message[1] = first;
     message[2] = second;
     memcpy( message + 3, payload, size );
+    printf("DBG: sending reply of type %d\n", type);
     // sprintf(&message[3], "%s",payload);
     // printf("DBG: replying [%x %x %x %x %x] (%s), %d\n", message[0], message[1], message[2], message[3], message[4], message, session.socket);
     ret = sendto( session.socket, message, size+3, 0, 
@@ -65,7 +66,7 @@ int send_reply(int type, char* payload, int size)
     printf("DBG: sent %d bytes\n", ret);
     if(ret != strlen(message)) 
     {
-        perror( "Net_client: error in writing");
+        perror( "Net_client: error in writing to socket");
         exit(1);
     }
     return 0;
@@ -75,6 +76,7 @@ int send_feedback_message()
 {
     int i, nwritten, nack_seq, reached_invalid = 0, j=0;
     char msg[1400], amsg[10], nmsg[10];
+    printf("DBG: sending feedback message\n");
     for(i=session.window_start_pointer; i< WINDOW_SIZE;i++)
     {
         if(session.slots[i].valid)
@@ -143,6 +145,7 @@ int send_feedback_message()
             if(!session.slots[i].valid)
             {
                 nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
+                printf("DBG: also receiving out of order, so sending nack for %d\n", nack_seq);
                 sprintf(nmsg, "N%d,", nack_seq);
                 strcat(msg,nmsg);
             }
@@ -153,11 +156,13 @@ int send_feedback_message()
             if(!session.slots[i].valid)
             {
                 nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
+                printf("DBG: also receiving out of order, so sending nack for %d\n", nack_seq);
                 sprintf(nmsg, "N%d,", nack_seq);
                 strcat(msg,nmsg);
             }
             j++;
         }
+        
     }
 
     send_reply(3, msg, strlen(msg));
@@ -210,7 +215,9 @@ int handle_file_send_request(int size, char* buffer, struct sockaddr_in connecti
 
 int handle_finalize(char *buffer)
 {
+    
     unsigned long receive_duration;
+    printf("DBG: handling finalize\n");
     // unsigned short seq_num = buffer[3];
     fclose(session.file.fw);
     session.status = WAITING;
@@ -224,6 +231,7 @@ int handle_finalize(char *buffer)
 
 void insert_into_window(int index, char*buffer, int size)
 {
+    printf("DBG: inserting into array %d\n", index);
     memcpy( session.slots[index].data, &buffer[5], size);
     session.slots[index].size = size;
     session.slots[index].valid = 1;
@@ -231,6 +239,7 @@ void insert_into_window(int index, char*buffer, int size)
 
 void check_order(int from, int current)
 {
+    printf("DBG: checking order\n");
     int i, ordered = 1;
     if(current < session.window_start_pointer)
     {
@@ -262,6 +271,7 @@ void check_order(int from, int current)
             }
         }
     }
+    printf("DBG: checking order result = %d\n", ordered);
     if(ordered)
         session.status = INORDER_RECEIVING;
     else
@@ -271,19 +281,23 @@ void check_order(int from, int current)
 
 int handle_file_receive(int size, char* buffer)
 {
-    unsigned short seq_num = buffer[3];
+    unsigned short seq_num = ((buffer[3] & 0xff) << 8) | (buffer[4] & 0xff);
+    printf("DBG: handling file receive, seq_num received is %u\n", seq_num);
     if (session.seq_number_to_receive > WINDOW_SIZE)    //e.g.:   0 ] 1  2  3  4 [ 5  6  7 
     {
+        printf("DBG: our window is intercepting the 2W\n");
         if(seq_num > session.seq_number_to_receive || seq_num < ((session.seq_number_to_receive + WINDOW_SIZE -1)% WINDOW_SIZE))
         {
             if(seq_num >= session.seq_number_to_receive)
             {
+                printf("DBG: finding array index1\n");
                 int index =  seq_num - session.seq_number_to_receive + session.window_start_pointer;
                 if(!session.slots[index%WINDOW_SIZE].valid)
                     insert_into_window(index%WINDOW_SIZE, buffer, size-2);
             }
             else 
             {
+                printf("DBG: finding array index2\n");
                 int index =  (2*WINDOW_SIZE) - session.seq_number_to_receive + seq_num + session.window_start_pointer;
                 if(!session.slots[index%WINDOW_SIZE].valid)
                     insert_into_window(index%WINDOW_SIZE, buffer, size-2);
@@ -292,6 +306,7 @@ int handle_file_receive(int size, char* buffer)
     }
     else
     {
+        printf("DBG: our window is not intercepting the 2W\n");
         if(seq_num > session.seq_number_to_receive && seq_num < (session.seq_number_to_receive + WINDOW_SIZE))
         {
             int index =  seq_num - session.seq_number_to_receive + session.window_start_pointer;
@@ -385,7 +400,7 @@ int main()
                 mess_buf[bytes] = 0;
                 from_ip = from_addr.sin_addr.s_addr;
 
-                printf( "Received from (%d.%d.%d.%d): %s\n", 
+                printf( "DBG: Received from (%d.%d.%d.%d): %s\n", 
                                 (htonl(from_ip) & 0xff000000)>>24,
                                 (htonl(from_ip) & 0x00ff0000)>>16,
                                 (htonl(from_ip) & 0x0000ff00)>>8,
