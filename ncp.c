@@ -240,8 +240,8 @@ int handle_nacknowledge(int sequence_number)
         index = ((sequence_number - session.seq_number_to_send) + session.window_start_pointer) % WINDOW_SIZE;
         second = sequence_number & 0x000000ff;
         first = (sequence_number >> (8)) & 0x000000ff;
-        buf[0] = first;
-        buf[1] = second;
+        buf[0] = second;
+        buf[1] = first;
         memcpy(buf + 2, session.slots[index ].data, session.slots[index].size);
         send_packet(2, buf, session.slots[index].size+2);
 
