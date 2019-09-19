@@ -197,8 +197,8 @@ int handle_acknowledge(int sequence_number)
                 }
                 second = ((session.seq_number_to_send+WINDOW_SIZE) % (2*WINDOW_SIZE)) & 0x000000ff;
                 first = ((session.seq_number_to_send+WINDOW_SIZE) % (2*WINDOW_SIZE)) & 0x000000ff;
-                buf[0] = first;
-                buf[1] = second;
+                buf[0] = second;
+                buf[1] = first;
                 memcpy(buf + 2, session.slots[session.window_start_pointer].data, session.slots[session.window_start_pointer].size);
                 
                 send_packet(2, buf, session.slots[session.window_start_pointer].size+2);
