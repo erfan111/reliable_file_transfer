@@ -63,6 +63,10 @@ int send_packet(int type, char * payload, int size)
     message[1] = first;
     message[2] = second;
     memcpy( message + 3, payload, size );
+    if(size != 1397)
+    {
+        printf("payload = %c - %c \n", message[1], message[2]);
+    }
     usleep(100);
     ret = sendto( session.socket, message, size+3, 0, 
                 (struct sockaddr *)&session.connection, sizeof(session.connection) );
@@ -181,6 +185,7 @@ int handle_acknowledge(int sequence_number)
                 buf[0] = first;
                 buf[1] = second;
                 memcpy(buf + 2, session.slots[session.window_start_pointer].data, session.slots[session.window_start_pointer].size);
+                
                 send_packet(2, buf, session.slots[session.window_start_pointer].size+2);
                 
                 session.window_start_pointer = (session.window_start_pointer+1) % WINDOW_SIZE;
