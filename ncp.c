@@ -147,7 +147,9 @@ int handle_acknowledge(int sequence_number)
     {
         if((sequence_number == 0 && session.seq_number_to_send == 0) || sequence_number  == session.seq_number_to_send+1)
         {
+            session.status = FINALIZING;
             send_packet(1, NULL, 0);
+            return 0;
         }
     }
 
@@ -158,28 +160,32 @@ int handle_acknowledge(int sequence_number)
         char buf[READ_BUF_SIZE+2];
         while(session.seq_number_to_send != sequence_number)
         {
-            session.seq_number_to_send = (session.seq_number_to_send +1) % (2*WINDOW_SIZE);
-            nread = fread(session.slots[session.window_start_pointer].data, 1, READ_BUF_SIZE, session.file.fr);
-            session.slots[session.window_start_pointer].size = nread;
-            session.slots[session.window_start_pointer].is_last_packet = 0;
-            if(nread < READ_BUF_SIZE) {
-                printf("DBG: FIN read less than buffer size = %d \n", nread);
-                if(feof(session.file.fr))
-                {
-                    printf("DBG: FIN eof reached \n");
-                    session.finalize_flag = 1;
-                    session.slots[session.window_start_pointer].is_last_packet = 1;
+            if(!session.finalize_flag)
+            {
+                session.seq_number_to_send = (session.seq_number_to_send +1) % (2*WINDOW_SIZE);
+                nread = fread(session.slots[session.window_start_pointer].data, 1, READ_BUF_SIZE, session.file.fr);
+                session.slots[session.window_start_pointer].size = nread;
+                session.slots[session.window_start_pointer].is_last_packet = 0;
+                if(nread < READ_BUF_SIZE) {
+                    printf("DBG: FIN read less than buffer size = %d \n", nread);
+                    if(feof(session.file.fr))
+                    {
+                        printf("DBG: FIN eof reached \n");
+                        session.finalize_flag = 1;
+                        session.slots[session.window_start_pointer].is_last_packet = 1;
+                    }
+                        
                 }
-                     
+                second = session.seq_number_to_send & 0x000000ff;
+                first = (session.seq_number_to_send >> (8)) & 0x000000ff;
+                buf[0] = first;
+                buf[1] = second;
+                memcpy(buf + 2, session.slots[session.window_start_pointer].data, session.slots[session.window_start_pointer].size);
+                send_packet(2, buf, session.slots[session.window_start_pointer].size+2);
+                
+                session.window_start_pointer = (session.window_start_pointer+1) % WINDOW_SIZE;
             }
-            second = session.seq_number_to_send & 0x000000ff;
-            first = (session.seq_number_to_send >> (8)) & 0x000000ff;
-            buf[0] = first;
-            buf[1] = second;
-            memcpy(buf + 2, session.slots[session.window_start_pointer].data, session.slots[session.window_start_pointer].size);
-            send_packet(2, buf, session.slots[session.window_start_pointer].size+2);
-            
-            session.window_start_pointer = (session.window_start_pointer+1) % WINDOW_SIZE;
+                
 
             session.file.total_bytes_sent += nread;
             session.recent_progress_bytes_sent += nread;
