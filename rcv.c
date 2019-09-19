@@ -64,7 +64,7 @@ int send_reply(int type, char* payload, int size)
     ret = sendto( session.socket, message, size+3, 0, 
                     (struct sockaddr *)&session.connection, sizeof(session.connection) );
     printf("DBG: sent %d bytes\n", ret);
-    if(ret != strlen(message)) 
+    if(ret != size+3) 
     {
         perror( "Net_client: error in writing to socket");
         exit(1);
