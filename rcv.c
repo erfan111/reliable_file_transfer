@@ -310,7 +310,7 @@ int handle_file_receive(int size, char* buffer)
     char sn_buffer[2];
     memcpy(sn_buffer, buffer + 3, 2);
     seq_num = *((u_int16_t*)sn_buffer);
-    printf("DBG: handling file receive, seq_num received is %u\n", seq_num);
+    printf("DBG: handling file receive, seq_num received is %u, our seqnum start=%d\n", seq_num, session.seq_number_to_receive);
     if (session.seq_number_to_receive > WINDOW_SIZE)    //e.g.:   0 ] 1  2  3  4 [ 5  6  7 
     {
         printf("DBG: our window is intercepting the 2W\n");
@@ -339,7 +339,7 @@ int handle_file_receive(int size, char* buffer)
         printf("DBG: our window is not intercepting the 2W\n");
         if(seq_num >= session.seq_number_to_receive && seq_num < (session.seq_number_to_receive + WINDOW_SIZE))
         {
-            int index =  seq_num - session.seq_number_to_receive + session.window_start_pointer;
+            int index = seq_num - session.seq_number_to_receive + session.window_start_pointer;
             if(!session.slots[index%WINDOW_SIZE].valid)
                 insert_into_window(index%WINDOW_SIZE, buffer, size-2);
         }
