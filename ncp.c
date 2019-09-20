@@ -71,7 +71,7 @@ int send_packet(int type, char * payload, int size)
     usleep(100);
     ret = sendto( session.socket, message, size+3, 0, 
                 (struct sockaddr *)&session.connection, sizeof(session.connection) );
-    printf("DBG: sent %d bytes\n", ret);
+    // printf("DBG: sent %d bytes\n", ret);
     if(ret != size+3) 
     {
         perror( "Net_client: error in writing");
@@ -200,7 +200,7 @@ int handle_acknowledge(int sequence_number)
                 buf[0] = second;
                 buf[1] = first;
                 memcpy(buf + 2, session.slots[session.window_start_pointer].data, session.slots[session.window_start_pointer].size);
-                
+                printf("DBG: sending %d, our window start is=%d\n", new_seq_num, session.seq_number_to_send);
                 send_packet(2, buf, session.slots[session.window_start_pointer].size+2);
 
                 
