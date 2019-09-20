@@ -164,6 +164,7 @@ int handle_acknowledge(int sequence_number)
     printf("DBG: handling ack %d\n", sequence_number);
     if(session.finalize_flag)
     {
+        printf("DBG: finalize flag is set, our last slot is %d, seqnum recvd is %d\n", session.last_slot_to_send_sequence_number, sequence_number);
         if(sequence_number == (session.last_slot_to_send_sequence_number + 1)%(2*WINDOW_SIZE))
         {
             session.status = FINALIZING;
