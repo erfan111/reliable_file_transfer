@@ -178,11 +178,10 @@ int handle_acknowledge(int sequence_number)
         int nread, new_seq_num;
         uint8_t first, second;
         char buf[READ_BUF_SIZE+2];
-        while(session.seq_number_to_send != sequence_number)
+        while(session.seq_number_to_send != sequence_number && !session.finalize_flag)
         {
-            printf("DBG: session seqnum = %d, seqnum received = %d, finalize = %d \n", session.seq_number_to_send, sequence_number, session.finalize_flag);
-            if(!session.finalize_flag)
-            {
+            // printf("DBG: session seqnum = %d, seqnum received = %d, finalize = %d \n", session.seq_number_to_send, sequence_number, session.finalize_flag);
+
                 nread = fread(session.slots[session.window_start_pointer].data, 1, READ_BUF_SIZE, session.file.fr);
                 session.slots[session.window_start_pointer].size = nread;
                 if(nread < READ_BUF_SIZE) {
@@ -207,12 +206,12 @@ int handle_acknowledge(int sequence_number)
                 
                 session.seq_number_to_send = (session.seq_number_to_send +1) % (2*WINDOW_SIZE);
                 session.window_start_pointer = (session.window_start_pointer+1) % WINDOW_SIZE;
-            }
-            else
-            {
-                if(sequence_number == session.last_slot_to_send_sequence_number)
-                    break;
-            }
+            // }
+            // else
+            // {
+            //     if(sequence_number == session.last_slot_to_send_sequence_number)
+            //         break;
+            // }
             
                 
 
