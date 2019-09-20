@@ -383,6 +383,8 @@ int main(int argc, char **argv)
 
     session.connection = send_addr;
     session.status = STARTING;
+    session.window_start_pointer = 0;
+    session.seq_number_to_send = 0;
     gettimeofday(&session.recent_progress_start_timestamp, NULL);
     gettimeofday(&session.send_start, NULL);
     
