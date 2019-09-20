@@ -134,7 +134,7 @@ int start_sending_the_file()
             long send_duration;
             gettimeofday(&session.recent_progress_end_timestamp, NULL);
             send_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
-            printf("Reporting: Total Bytes = %luMB , Total Time = %luMSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_sent/(2 << 20), send_duration/1000, (session.recent_progress_bytes_sent*8)/send_duration);
+            printf("Reporting: Total Bytes = %luMB , Total Time = %luMSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_sent/1048576, send_duration/1000, (session.recent_progress_bytes_sent*8)/send_duration);
             gettimeofday(&session.recent_progress_start_timestamp, NULL);
             session.recent_progress_bytes_sent = 0;
 
@@ -222,7 +222,7 @@ int handle_acknowledge(int sequence_number)
                 long send_duration;
                 gettimeofday(&session.recent_progress_end_timestamp, NULL);
                 send_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
-                printf("Reporting: Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", session.recent_progress_bytes_sent, send_duration, (session.recent_progress_bytes_sent*8)/send_duration);
+                printf("Reporting: Total Bytes = %luMB , Total Time = %luMSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_sent/1048576, send_duration/1000, (session.recent_progress_bytes_sent*8)/send_duration);
                 gettimeofday(&session.recent_progress_start_timestamp, NULL);
                 session.recent_progress_bytes_sent = 0;
 
@@ -307,7 +307,7 @@ int parse(char *buffer, int size)
         unsigned long send_duration;
         gettimeofday(&session.send_end, NULL);
         send_duration = (session.send_end.tv_sec - session.send_start.tv_sec)*1000000 + (session.send_end.tv_usec - session.send_start.tv_usec);
-        printf("Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", session.file.total_bytes_sent, send_duration, (session.file.total_bytes_sent*8)/send_duration);
+        printf("Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_sent/1048576, send_duration/1000, (session.file.total_bytes_sent*8)/send_duration);
         exit(0);
     }
     else

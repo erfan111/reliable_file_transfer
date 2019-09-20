@@ -98,7 +98,7 @@ int send_feedback_message() // TODO: call it when window is completely received
                 gettimeofday(&session.recent_progress_end_timestamp, NULL);
                 receive_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
                 
-                printf("Reporting: Total Bytes = %luMB , Total Time = %luMSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_receive/(2 << 20), receive_duration/1000, (session.recent_progress_bytes_receive*8)/receive_duration);
+                printf("Reporting: Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_receive/(1048576), receive_duration/1000, (session.recent_progress_bytes_receive*8)/receive_duration);
                 gettimeofday(&session.recent_progress_start_timestamp, NULL);
                 session.recent_progress_bytes_receive = 0;
             }
@@ -133,7 +133,7 @@ int send_feedback_message() // TODO: call it when window is completely received
                 gettimeofday(&session.recent_progress_end_timestamp, NULL);
                 receive_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
                 
-                printf("Reporting: Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", session.recent_progress_bytes_receive, receive_duration, (session.recent_progress_bytes_receive*8)/receive_duration);
+                printf("Reporting: Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_receive/1048576, receive_duration/1000, (session.recent_progress_bytes_receive*8)/receive_duration);
                 gettimeofday(&session.recent_progress_start_timestamp, NULL);
                 session.recent_progress_bytes_receive = 0;
             }
@@ -228,6 +228,7 @@ int handle_file_send_request(int size, char* buffer, struct sockaddr_in connecti
 {
     // printf("DBG: handling file send request, %d\n", size);
     gettimeofday(&session.receive_start, NULL);
+    gettimeofday(&session.recent_progress_start_timestamp, NULL);
     session.window_start_sequence_number = 0;
     session.status = INORDER_RECEIVING;
     session.connection = connection;
@@ -257,7 +258,7 @@ int handle_finalize(char *buffer)
     session.status = WAITING;
     gettimeofday(&session.receive_end, NULL);
     receive_duration = (session.receive_end.tv_sec - session.receive_start.tv_sec)*1000000 + (session.receive_end.tv_usec - session.receive_start.tv_usec);
-    printf("Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", session.file.total_bytes_receive, receive_duration, (session.file.total_bytes_receive*8)/receive_duration);
+    printf("Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_receive/1048576, receive_duration/1000, (session.file.total_bytes_receive*8)/receive_duration);
 
     send_finalize_message();
     return 0;
