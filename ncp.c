@@ -180,6 +180,7 @@ int handle_acknowledge(int sequence_number)
         char buf[READ_BUF_SIZE+2];
         while(session.seq_number_to_send != sequence_number)
         {
+            printf("DBG: session seqnum = %d, seqnum received = %d, finalize = %d \n", session.seq_number_to_send, sequence_number, session.finalize_flag);
             if(!session.finalize_flag)
             {
                 nread = fread(session.slots[session.window_start_pointer].data, 1, READ_BUF_SIZE, session.file.fr);
