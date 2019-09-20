@@ -33,7 +33,7 @@ typedef struct file_to_transmit_t {
 typedef struct Session_t {
     struct sockaddr_in connection;
     Window_slot slots[WINDOW_SIZE];
-    int seq_number_to_receive;
+    int window_start_sequence_number;
     int window_start_pointer;
     enum STATUS status;
     file_to_transmit file;
@@ -72,11 +72,12 @@ int send_reply(int type, char* payload, int size)
     return 0;
 }
 
-int send_feedback_message()
+int send_feedback_message() // TODO: call it when window is completely received
 {
-    int i, nwritten, nack_seq, reached_invalid = 0, j=0, window_start_incremnt = 0;
+    int i, nwritten, nack_seq, reached_invalid = 0, window_start_incremnt = 0;
     char msg[1400], amsg[10], nmsg[10];
     printf("DBG: sending feedback message\n");
+    check_order();
     for(i=session.window_start_pointer; i< WINDOW_SIZE;i++)
     {
         if(session.slots[i].valid)
@@ -104,9 +105,9 @@ int send_feedback_message()
             session.slots[i].valid = 0;
             window_start_incremnt++;
             
-            session.seq_number_to_receive++;
-            if(session.seq_number_to_receive >= 2*WINDOW_SIZE)
-                session.seq_number_to_receive = 0;
+            session.window_start_sequence_number++;
+            if(session.window_start_sequence_number >= 2*WINDOW_SIZE)
+                session.window_start_sequence_number = 0;
         }
         else{
             reached_invalid = 1;
@@ -138,9 +139,9 @@ int send_feedback_message()
 
             session.slots[i].valid = 0;
             window_start_incremnt++;
-            session.seq_number_to_receive++;
-            if(session.seq_number_to_receive >= 2*WINDOW_SIZE)
-                session.seq_number_to_receive = 0;
+            session.window_start_sequence_number++;
+            if(session.window_start_sequence_number >= 2*WINDOW_SIZE)
+                session.window_start_sequence_number = 0;
         }
         else{
             reached_invalid = 1;
@@ -148,24 +149,23 @@ int send_feedback_message()
         }
     }
     session.window_start_pointer = (session.window_start_pointer + window_start_incremnt) % WINDOW_SIZE;
-    sprintf(amsg, "A%d,", session.seq_number_to_receive);
-    printf("DBG: receiving in order, so sending an ack for %d (%s)\n", session.seq_number_to_receive, msg);
+    sprintf(amsg, "A%d,", session.window_start_sequence_number);
+    printf("DBG: receiving in order, so sending an ack for %d (%s)\n", session.window_start_sequence_number, msg);
     strcpy(msg, amsg);
     if(session.status == OUTOFORDER_RECEIVING)
     {
 
         if(session.window_start_pointer  <= session.last_valid_index)
         {
-            for(i=session.window_start_pointer; i<= session.last_valid_index;i++)
+            for(i=session.window_start_pointer; i< session.last_valid_index;i++)
             {
                 if(!session.slots[i].valid)
                 {
-                    nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
+                    nack_seq = (i-session.window_start_pointer + session.window_start_sequence_number)% (2*WINDOW_SIZE);
                     printf("DBG: also receiving out of order, so sending nack for %d\n", nack_seq);
                     sprintf(nmsg, "N%d,", nack_seq);
                     strcat(msg,nmsg);
                 }
-                j++;
             }
         }
         else {
@@ -173,23 +173,21 @@ int send_feedback_message()
             {
                 if(!session.slots[i].valid)
                 {
-                    nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
+                    nack_seq = (i-session.window_start_pointer + session.window_start_sequence_number)% (2*WINDOW_SIZE);
                     printf("DBG: also receiving out of order, so sending nack for %d\n", nack_seq);
                     sprintf(nmsg, "N%d,", nack_seq);
                     strcat(msg,nmsg);
                 }
-                j++;
             }
             for(i=0; i<= session.last_valid_index;i++)
             {
                 if(!session.slots[i].valid)
                 {
-                    nack_seq = (session.seq_number_to_receive + j)% (2*WINDOW_SIZE);
+                    nack_seq = (WINDOW_SIZE - session.window_start_pointer + session.window_start_sequence_number + i)% (2*WINDOW_SIZE);
                     printf("DBG: also receiving out of order, so sending nack for %d\n", nack_seq);
                     sprintf(nmsg, "N%d,", nack_seq);
                     strcat(msg,nmsg);
                 }
-                j++;
             }
         }
         
@@ -228,7 +226,7 @@ u_int16_t get_payload_size(char *buffer)
 int handle_file_send_request(int size, char* buffer, struct sockaddr_in connection)
 {
     printf("DBG: handling file send request, %d\n", size);
-    session.seq_number_to_receive = 0;
+    session.window_start_sequence_number = 0;
     session.status = INORDER_RECEIVING;
     session.connection = connection;
     session.window_start_pointer = 0;
@@ -308,23 +306,23 @@ int handle_file_receive(int size, char* buffer)
     char sn_buffer[2];
     memcpy(sn_buffer, buffer + 3, 2);
     seq_num = *((u_int16_t*)sn_buffer);
-    printf("DBG: handling file receive, seq_num received is %u, our seqnum start=%d\n", seq_num, session.seq_number_to_receive);
-    if (session.seq_number_to_receive > WINDOW_SIZE)    //e.g.:   0 ] 1  2  3  4 [ 5  6  7 
+    printf("DBG: handling file receive, seq_num received is %u, our seqnum start=%d\n", seq_num, session.window_start_sequence_number);
+    if (session.window_start_sequence_number > WINDOW_SIZE)    //e.g.:   0 ] 1  2  3  4 [ 5  6  7 
     {
         printf("DBG: our window is intercepting the 2W\n");
-        if(seq_num >= session.seq_number_to_receive || seq_num <= ((session.seq_number_to_receive + WINDOW_SIZE -1)% WINDOW_SIZE))
+        if(seq_num >= session.window_start_sequence_number || seq_num <= ((session.window_start_sequence_number + WINDOW_SIZE -1)% WINDOW_SIZE))
         {
-            if(seq_num >= session.seq_number_to_receive)
+            if(seq_num >= session.window_start_sequence_number)
             {
                 printf("DBG: finding array index1\n");
-                int index =  seq_num - session.seq_number_to_receive + session.window_start_pointer;
+                int index =  seq_num - session.window_start_sequence_number + session.window_start_pointer;
                 if(!session.slots[index%WINDOW_SIZE].valid)
                     insert_into_window(index%WINDOW_SIZE, buffer, size-2);
             }
             else 
             {
                 printf("DBG: finding array index2\n");
-                int index =  (2*WINDOW_SIZE) - session.seq_number_to_receive + seq_num + session.window_start_pointer;
+                int index =  seq_num - session.window_start_sequence_number + session.window_start_pointer;
                 if(!session.slots[index%WINDOW_SIZE].valid)
                     insert_into_window(index%WINDOW_SIZE, buffer, size-2);
             }
@@ -335,9 +333,9 @@ int handle_file_receive(int size, char* buffer)
     else
     {
         printf("DBG: our window is not intercepting the 2W\n");
-        if(seq_num >= session.seq_number_to_receive && seq_num < (session.seq_number_to_receive + WINDOW_SIZE))
+        if(seq_num >= session.window_start_sequence_number && seq_num < (session.window_start_sequence_number + WINDOW_SIZE))
         {
-            int index = seq_num - session.seq_number_to_receive + session.window_start_pointer;
+            int index = seq_num - session.window_start_sequence_number + session.window_start_pointer;
             if(!session.slots[index%WINDOW_SIZE].valid)
                 insert_into_window(index%WINDOW_SIZE, buffer, size-2);
         }
@@ -345,7 +343,7 @@ int handle_file_receive(int size, char* buffer)
             printf("DBG: out of window sequence number\n");
 
     }
-    check_order();
+    
     return 0;
 }
 
