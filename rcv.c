@@ -1,7 +1,7 @@
 #include "net_include.h"
 
 #define NAME_LENGTH 80
-
+#define REPORT_BYTES_RECVD 2 << 20
 ////
 
 enum STATUS {
@@ -43,6 +43,8 @@ typedef struct Session_t {
     int socket;
     int last_valid_index;
 } Session;
+
+void check_order();
 
 Session session;
 
@@ -90,7 +92,7 @@ int send_feedback_message() // TODO: call it when window is completely received
 
             session.file.total_bytes_receive += nwritten;
             session.recent_progress_bytes_receive += nwritten;
-            if(session.recent_progress_bytes_receive >= 100000000)
+            if(session.recent_progress_bytes_receive >= 100*REPORT_BYTES_RECVD)
             {
                 unsigned long receive_duration;
                 // printf("DBG: reporting...\n");
@@ -125,7 +127,7 @@ int send_feedback_message() // TODO: call it when window is completely received
             }
             session.file.total_bytes_receive += nwritten;
             session.recent_progress_bytes_receive += nwritten;
-            if(session.recent_progress_bytes_receive >= 100000000)
+            if(session.recent_progress_bytes_receive >= 100*REPORT_BYTES_RECVD)
             {
                 unsigned long receive_duration;
                 // printf("DBG: reporting...\n");
@@ -274,7 +276,7 @@ void check_order()
     printf("DBG: checking order\n");
     int i, saw_invalid = 0;
     session.status = INORDER_RECEIVING;
-    for(i=session.window_start_pointer; i<WINDOW_SIZE;i++)
+    for(i=session.window_start_pointer; i<WINDOW_SIZE;i++) //TODO: only 1 for, use ++i%W
     {
         if(session.slots[i].valid == 0)
             saw_invalid = 1;

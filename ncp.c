@@ -21,7 +21,6 @@ typedef struct Window_slot_t {
     char* data;
     int size;
     int valid;
-    int is_last_packet;
     int sent;
 } Window_slot;
 
@@ -50,6 +49,7 @@ typedef struct Session_t {
     char *dest_file_name;
     int dest_file_name_size;
     int finalize_flag;
+    int last_slot_to_send_sequence_number;
 } Session;
 
 Session session;
@@ -164,7 +164,7 @@ int handle_acknowledge(int sequence_number)
     printf("DBG: handling ack %d\n", sequence_number);
     if(session.finalize_flag)
     {
-        if((sequence_number == 0 && session.seq_number_to_send == 0) || sequence_number  == session.seq_number_to_send+1)
+        if(sequence_number == (session.last_slot_to_send_sequence_number + 1)%(2*WINDOW_SIZE))
         {
             session.status = FINALIZING;
             send_packet(1, NULL, 0);
@@ -181,17 +181,15 @@ int handle_acknowledge(int sequence_number)
         {
             if(!session.finalize_flag)
             {
-                session.seq_number_to_send = (session.seq_number_to_send +1) % (2*WINDOW_SIZE);
                 nread = fread(session.slots[session.window_start_pointer].data, 1, READ_BUF_SIZE, session.file.fr);
                 session.slots[session.window_start_pointer].size = nread;
-                session.slots[session.window_start_pointer].is_last_packet = 0;
                 if(nread < READ_BUF_SIZE) {
                     printf("DBG: FIN read less than buffer size = %d \n", nread);
                     if(feof(session.file.fr))
                     {
                         printf("DBG: FIN eof reached \n");
                         session.finalize_flag = 1;
-                        session.slots[session.window_start_pointer].is_last_packet = 1;
+                        session.last_slot_to_send_sequence_number = (session.seq_number_to_send+WINDOW_SIZE) % (2*WINDOW_SIZE);
                     }
                         
                 }
@@ -205,7 +203,7 @@ int handle_acknowledge(int sequence_number)
                 send_packet(2, buf, session.slots[session.window_start_pointer].size+2);
 
                 
-                
+                session.seq_number_to_send = (session.seq_number_to_send +1) % (2*WINDOW_SIZE);
                 session.window_start_pointer = (session.window_start_pointer+1) % WINDOW_SIZE;
             }
                 
