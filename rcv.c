@@ -366,7 +366,7 @@ int parse(char* buffer, int length, struct sockaddr_in connection)
             handle_finalize(buffer);
             break;
         case 2:
-            printf("DBG: message type is data\n");
+            // printf("DBG: message type is data\n");
             payload_size = get_payload_size(buffer);
             handle_file_receive(payload_size, buffer);
             break;
@@ -419,7 +419,7 @@ int main()
     {
         read_mask = mask;
         timeout.tv_sec = 0;
-        timeout.tv_usec = 10000;
+        timeout.tv_usec = 5000;
         num = select( FD_SETSIZE, &read_mask, &write_mask, &excep_mask, &timeout);
         if (num > 0) {
             if ( FD_ISSET( sr, &read_mask) ) {
