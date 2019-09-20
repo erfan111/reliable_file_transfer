@@ -20,3 +20,4 @@
 #define MAX_MESS_LEN 1400
 
 #define WINDOW_SIZE 100
+#define REPORT_BYTES_RECVD (100 * (2 << 20))

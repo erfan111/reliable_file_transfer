@@ -129,12 +129,12 @@ int start_sending_the_file()
 
         session.file.total_bytes_sent += nread;
         session.recent_progress_bytes_sent += nread;
-        if(session.recent_progress_bytes_sent >= 100000000)
+        if(session.recent_progress_bytes_sent >= REPORT_BYTES_RECVD )
         {
             long send_duration;
             gettimeofday(&session.recent_progress_end_timestamp, NULL);
             send_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
-            printf("Reporting: Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", session.recent_progress_bytes_sent, send_duration, (session.recent_progress_bytes_sent*8)/send_duration);
+            printf("Reporting: Total Bytes = %luMB , Total Time = %luMSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_sent/(2 << 20), send_duration/1000, (session.recent_progress_bytes_sent*8)/send_duration);
             gettimeofday(&session.recent_progress_start_timestamp, NULL);
             session.recent_progress_bytes_sent = 0;
 

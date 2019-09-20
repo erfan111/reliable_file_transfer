@@ -1,7 +1,6 @@
 #include "net_include.h"
 
 #define NAME_LENGTH 80
-#define REPORT_BYTES_RECVD 2 << 20
 ////
 
 enum STATUS {
@@ -92,14 +91,14 @@ int send_feedback_message() // TODO: call it when window is completely received
 
             session.file.total_bytes_receive += nwritten;
             session.recent_progress_bytes_receive += nwritten;
-            if(session.recent_progress_bytes_receive >= 100*REPORT_BYTES_RECVD)
+            if(session.recent_progress_bytes_receive >= REPORT_BYTES_RECVD)
             {
                 unsigned long receive_duration;
                 // printf("DBG: reporting...\n");
                 gettimeofday(&session.recent_progress_end_timestamp, NULL);
                 receive_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
                 
-                printf("Reporting: Total Bytes = %lu , Total Time = %lu, Average Transfer Rate = %lu \n", session.recent_progress_bytes_receive, receive_duration, (session.recent_progress_bytes_receive*8)/receive_duration);
+                printf("Reporting: Total Bytes = %luMB , Total Time = %luMSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_receive/(2 << 20), receive_duration/1000, (session.recent_progress_bytes_receive*8)/receive_duration);
                 gettimeofday(&session.recent_progress_start_timestamp, NULL);
                 session.recent_progress_bytes_receive = 0;
             }
@@ -127,7 +126,7 @@ int send_feedback_message() // TODO: call it when window is completely received
             }
             session.file.total_bytes_receive += nwritten;
             session.recent_progress_bytes_receive += nwritten;
-            if(session.recent_progress_bytes_receive >= 100*REPORT_BYTES_RECVD)
+            if(session.recent_progress_bytes_receive >= REPORT_BYTES_RECVD)
             {
                 unsigned long receive_duration;
                 // printf("DBG: reporting...\n");
@@ -228,6 +227,7 @@ u_int16_t get_payload_size(char *buffer)
 int handle_file_send_request(int size, char* buffer, struct sockaddr_in connection)
 {
     // printf("DBG: handling file send request, %d\n", size);
+    gettimeofday(&session.receive_start, NULL);
     session.window_start_sequence_number = 0;
     session.status = INORDER_RECEIVING;
     session.connection = connection;
