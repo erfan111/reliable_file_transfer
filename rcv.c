@@ -325,7 +325,7 @@ int handle_file_receive(int size, char* buffer)
             {
                 
                 int index =  seq_num - session.window_start_sequence_number + session.window_start_pointer;
-                printf("DBG: finding array index2, index = %d - invalid? %d\n", index, session.slots[index%WINDOW_SIZE].valid);
+                printf("DBG: finding array index2, index = %d - \n", index);
                 if(!session.slots[index%WINDOW_SIZE].valid)
                     insert_into_window(index%WINDOW_SIZE, buffer, size-2);
             }
