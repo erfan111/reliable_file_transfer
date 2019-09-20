@@ -174,7 +174,7 @@ int handle_acknowledge(int sequence_number)
 
     if(is_seqnum_in_window(sequence_number))
     {
-        int nread;
+        int nread, new_seq_num;
         uint8_t first, second;
         char buf[READ_BUF_SIZE+2];
         while(session.seq_number_to_send != sequence_number)
@@ -195,8 +195,9 @@ int handle_acknowledge(int sequence_number)
                     }
                         
                 }
-                second = ((session.seq_number_to_send+WINDOW_SIZE) % (2*WINDOW_SIZE)) & 0x000000ff;
-                first = ((session.seq_number_to_send+WINDOW_SIZE) % (2*WINDOW_SIZE)) & 0x000000ff;
+                new_seq_num = (session.seq_number_to_send+WINDOW_SIZE) % (2*WINDOW_SIZE);
+                second = new_seq_num & 0x000000ff;
+                first = (new_seq_num >> (8)) & 0x000000ff;
                 buf[0] = second;
                 buf[1] = first;
                 memcpy(buf + 2, session.slots[session.window_start_pointer].data, session.slots[session.window_start_pointer].size);
