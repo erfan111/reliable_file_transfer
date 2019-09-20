@@ -122,8 +122,8 @@ int start_sending_the_file()
         session.slots[i].size = nread;
         second = i & 0x000000ff;
         first = (i >> (8)) & 0x000000ff;
-        buf[0] = first;
-        buf[1] = second;
+        buf[0] = second;
+        buf[1] = first;
         memcpy(buf + 2, session.slots[i].data, session.slots[i].size);
         send_packet(2, buf, session.slots[i].size+2);
 
