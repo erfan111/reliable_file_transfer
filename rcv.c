@@ -74,7 +74,7 @@ int send_reply(int type, char* payload, int size)
 
 int send_feedback_message()
 {
-    int i, nwritten, nack_seq, reached_invalid = 0, j=0;
+    int i, nwritten, nack_seq, reached_invalid = 0, j=0, window_start_incremnt = 0;
     char msg[1400], amsg[10], nmsg[10];
     printf("DBG: sending feedback message\n");
     for(i=session.window_start_pointer; i< WINDOW_SIZE;i++)
@@ -102,9 +102,8 @@ int send_feedback_message()
             }
 
             session.slots[i].valid = 0;
-            session.window_start_pointer++;
-            if(session.window_start_pointer >= WINDOW_SIZE)
-                session.window_start_pointer = 0;
+            window_start_incremnt++;
+            
             session.seq_number_to_receive++;
             if(session.seq_number_to_receive >= 2*WINDOW_SIZE)
                 session.seq_number_to_receive = 0;
@@ -138,9 +137,7 @@ int send_feedback_message()
             }
 
             session.slots[i].valid = 0;
-            session.window_start_pointer++;
-            if(session.window_start_pointer >= WINDOW_SIZE)
-                session.window_start_pointer = 0;
+            window_start_incremnt++;
             session.seq_number_to_receive++;
             if(session.seq_number_to_receive >= 2*WINDOW_SIZE)
                 session.seq_number_to_receive = 0;
@@ -150,6 +147,7 @@ int send_feedback_message()
             break;
         }
     }
+    session.window_start_pointer = (session.window_start_pointer + window_start_incremnt) % WINDOW_SIZE;
     sprintf(amsg, "A%d,", session.seq_number_to_receive);
     printf("DBG: receiving in order, so sending an ack for %d (%s)\n", session.seq_number_to_receive, msg);
     strcpy(msg, amsg);
