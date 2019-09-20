@@ -129,7 +129,7 @@ int start_sending_the_file()
 
         session.file.total_bytes_sent += nread;
         session.recent_progress_bytes_sent += nread;
-        if(session.recent_progress_bytes_sent >= REPORT_BYTES_RECVD )
+        if(session.recent_progress_bytes_sent >= 104857600 )
         {
             long send_duration;
             gettimeofday(&session.recent_progress_end_timestamp, NULL);
@@ -217,7 +217,7 @@ int handle_acknowledge(int sequence_number)
 
             session.file.total_bytes_sent += nread;
             session.recent_progress_bytes_sent += nread;
-            if(session.recent_progress_bytes_sent >= 100000000)
+            if(session.recent_progress_bytes_sent >= 104857600)
             {
                 long send_duration;
                 gettimeofday(&session.recent_progress_end_timestamp, NULL);

@@ -91,7 +91,7 @@ int send_feedback_message() // TODO: call it when window is completely received
 
             session.file.total_bytes_receive += nwritten;
             session.recent_progress_bytes_receive += nwritten;
-            if(session.recent_progress_bytes_receive >= REPORT_BYTES_RECVD)
+            if(session.recent_progress_bytes_receive >= 104857600)
             {
                 unsigned long receive_duration;
                 // printf("DBG: reporting...\n");
@@ -126,7 +126,7 @@ int send_feedback_message() // TODO: call it when window is completely received
             }
             session.file.total_bytes_receive += nwritten;
             session.recent_progress_bytes_receive += nwritten;
-            if(session.recent_progress_bytes_receive >= REPORT_BYTES_RECVD)
+            if(session.recent_progress_bytes_receive >= 104857600)
             {
                 unsigned long receive_duration;
                 // printf("DBG: reporting...\n");
@@ -415,7 +415,6 @@ int main()
     FD_ZERO( &write_mask );
     FD_ZERO( &excep_mask );
     FD_SET( sr, &mask );
-    FD_SET( (long)0, &mask ); /* stdin */
     for(;;)
     {
         read_mask = mask;
