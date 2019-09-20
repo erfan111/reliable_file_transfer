@@ -207,6 +207,12 @@ int handle_acknowledge(int sequence_number)
                 session.seq_number_to_send = (session.seq_number_to_send +1) % (2*WINDOW_SIZE);
                 session.window_start_pointer = (session.window_start_pointer+1) % WINDOW_SIZE;
             }
+            else
+            {
+                if(sequence_number == session.last_slot_to_send_sequence_number)
+                    break;
+            }
+            
                 
 
             session.file.total_bytes_sent += nread;
