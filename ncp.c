@@ -130,14 +130,14 @@ int start_sending_the_file()
 
 int is_seqnum_in_window(int seq_number)
 {
-    if(session.seq_number_to_send > window_size_override)
+    if(session.seq_number_to_send +1 >= window_size_override)  //overlapping
     {
-        if(seq_number >= session.seq_number_to_send || seq_number < (2*window_size_override - session.seq_number_to_send))
+        if((seq_number >= session.seq_number_to_send && seq_number <= ((2*window_size_override)-1)) || (seq_number <= (session.seq_number_to_send - window_size_override)))
             return 1;
     }
     else
     {
-        if(seq_number >= session.seq_number_to_send || seq_number < session.seq_number_to_send + window_size_override + 1)
+        if(seq_number >= session.seq_number_to_send && seq_number < (session.seq_number_to_send + window_size_override))
             return 1;
     }
     if(debug_mode)
@@ -247,8 +247,7 @@ int parse_feedback_message(char * buffer, int size)
     memcpy(payload, buffer + 3, payload_size);
     char delimiter[] = ",";
     char *ptr = strtok(payload, delimiter);
-    if(debug_mode)
-        printf("DBG: parsing the feedback message sequence number = %d\n", sequence_number);
+    
     while(ptr != NULL)
     {
         if(ptr[0] == 'A')
