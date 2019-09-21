@@ -3,19 +3,8 @@
 #define NAME_LENGTH 80
 #define READ_BUF_SIZE 1395
 
-int gethostname(char*,size_t);
-
-void PromptForHostName( char *my_name, char *host_name, size_t max_len ); 
-
-
-enum STATUS {
-    WAITING,
-    STARTING,
-    SENDING,
-    FINALIZING,
-    INORDER_RECEIVING,
-    OUTOFORDER_RECEIVING
-};
+int window_size_override;
+int debug_mode = 0;
 
 typedef struct Window_slot_t {
     char* data;
@@ -36,7 +25,7 @@ typedef struct file_to_transmit_t {
 
 typedef struct Session_t {
     struct sockaddr_in connection;
-    Window_slot slots[WINDOW_SIZE];
+    Window_slot *slots;
     int seq_number_to_send;
     int window_start_pointer;
     enum STATUS status;
@@ -113,7 +102,7 @@ int start_sending_the_file()
     uint8_t second;
     uint8_t first;
     // printf("DBG: starting to send the file\n");
-    for(i=0;i < WINDOW_SIZE;i++)
+    for(i=0;i < window_size_override;i++)
     {
         session.slots[i].data = malloc(1395);
         session.slots[i].valid = 1;
@@ -145,14 +134,14 @@ int start_sending_the_file()
 
 int is_seqnum_in_window(int seq_number)
 {
-    if(session.seq_number_to_send > WINDOW_SIZE)
+    if(session.seq_number_to_send > window_size_override)
     {
-        if(seq_number >= session.seq_number_to_send || seq_number < (2*WINDOW_SIZE - session.seq_number_to_send))
+        if(seq_number >= session.seq_number_to_send || seq_number < (2*window_size_override - session.seq_number_to_send))
             return 1;
     }
     else
     {
-        if(seq_number >= session.seq_number_to_send || seq_number < session.seq_number_to_send + WINDOW_SIZE + 1)
+        if(seq_number >= session.seq_number_to_send || seq_number < session.seq_number_to_send + window_size_override + 1)
             return 1;
     }
     // printf("DBG: seqnum received was not in window\n");
@@ -165,7 +154,7 @@ int handle_acknowledge(int sequence_number)
     if(session.finalize_flag)
     {
         // printf("DBG: finalize flag is set, our last slot is %d, seqnum recvd is %d\n", session.last_slot_to_send_sequence_number, sequence_number);
-        if(sequence_number == (session.last_slot_to_send_sequence_number + 1)%(2*WINDOW_SIZE))
+        if(sequence_number == (session.last_slot_to_send_sequence_number + 1)%(2*window_size_override))
         {
             session.status = FINALIZING;
             send_packet(1, NULL, 0);
@@ -190,11 +179,11 @@ int handle_acknowledge(int sequence_number)
                     {
                         // printf("DBG: FIN eof reached \n");
                         session.finalize_flag = 1;
-                        session.last_slot_to_send_sequence_number = (session.seq_number_to_send+WINDOW_SIZE) % (2*WINDOW_SIZE);
+                        session.last_slot_to_send_sequence_number = (session.seq_number_to_send+window_size_override) % (2*window_size_override);
                     }
                         
                 }
-                new_seq_num = (session.seq_number_to_send+WINDOW_SIZE) % (2*WINDOW_SIZE);
+                new_seq_num = (session.seq_number_to_send+window_size_override) % (2*window_size_override);
                 second = new_seq_num & 0x000000ff;
                 first = (new_seq_num >> (8)) & 0x000000ff;
                 buf[0] = second;
@@ -204,8 +193,8 @@ int handle_acknowledge(int sequence_number)
                 send_packet(2, buf, session.slots[session.window_start_pointer].size+2);
 
                 
-                session.seq_number_to_send = (session.seq_number_to_send +1) % (2*WINDOW_SIZE);
-                session.window_start_pointer = (session.window_start_pointer+1) % WINDOW_SIZE;
+                session.seq_number_to_send = (session.seq_number_to_send +1) % (2*window_size_override);
+                session.window_start_pointer = (session.window_start_pointer+1) % window_size_override;
             // }
             // else
             // {
@@ -242,8 +231,8 @@ int handle_nacknowledge(int sequence_number)
         char buf[READ_BUF_SIZE+2];
         int index;
         if(sequence_number < session.seq_number_to_send)
-            sequence_number += (2*WINDOW_SIZE);
-        index = ((sequence_number - session.seq_number_to_send) + session.window_start_pointer) % WINDOW_SIZE;
+            sequence_number += (2*window_size_override);
+        index = ((sequence_number - session.seq_number_to_send) + session.window_start_pointer) % window_size_override;
         second = sequence_number & 0x000000ff;
         first = (sequence_number >> (8)) & 0x000000ff;
         buf[0] = second;
@@ -336,12 +325,13 @@ int main(int argc, char **argv)
     char                  mess_buf[MAX_MESS_LEN];
     char                  input_buf[80];
     struct timeval        timeout;
+    char                  delim[] = "@";
+    int                   file_name_size;
+    char*                 destination_string;
 
-    int file_name_size;
 
-
-    if(argc != 5) {
-        printf("Usage: ncp <loss_rate> <source_file> <destination_file> <comp_name>\n");
+    if(argc != 4 && argc != 6) {
+        printf("Usage: ncp <loss_rate> <source_file> <destination_file>@<comp_name> [window_size_overrride] [debug mode = {1}]\n");
         exit(0);
     }
     session.loss_rate = atoi(argv[1]);
@@ -350,14 +340,21 @@ int main(int argc, char **argv)
     memcpy(session.file.file_name, argv[2], strlen(argv[2]));
     session.file.filename_length = file_name_size;
 
-    session.dest_file_name_size = strlen(argv[3]);
+    destination_string = strtok(argv[3], delim);
+    session.dest_file_name_size = strlen(destination_string);
     session.dest_file_name = malloc(session.dest_file_name_size+1);
-    memcpy(session.dest_file_name, argv[3], strlen(argv[3]));
-
-    strncpy(host_name, argv[4], strlen(argv[4]));
+    memcpy(session.dest_file_name, destination_string, strlen(destination_string));
+    destination_string = strtok(NULL, delim);
+    strncpy(host_name, destination_string, strlen(destination_string));
 
     printf("loss=%d, source = %s, dest = %s, hostname = %s \n", session.loss_rate, session.file.file_name, session.dest_file_name, host_name);
     
+    if(argc == 6)
+    {
+        debug_mode = atoi(argv[2]);
+        window_size_override = atoi(argv[1]);
+    }
+
     sr = socket(AF_INET, SOCK_DGRAM, 0);  /* socket for receiving (udp) */
     if (sr<0) {
         perror("Ucast: socket");
@@ -388,6 +385,7 @@ int main(int argc, char **argv)
     send_addr.sin_addr.s_addr = host_num; 
     send_addr.sin_port = htons(PORT);
 
+    session.slots = malloc(window_size_override * sizeof(Window_slot));
     session.connection = send_addr;
     session.status = STARTING;
     session.window_start_pointer = 0;
