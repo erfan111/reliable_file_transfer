@@ -141,7 +141,7 @@ int send_feedback_message() // TODO: call it when window is completely received
     session.window_start_pointer = (session.window_start_pointer + window_start_incremnt) % window_size_override;
     sprintf(amsg, "A%d,", session.window_start_sequence_number);
     if(debug_mode)
-        printf("DBG: receiving in order, so sending an ack for %d (%s)\n", session.window_start_sequence_number, msg);
+        printf("DBG: receiving in order, so sending an ack for %d (%s)\n", session.window_start_sequence_number, amsg);
     strcpy(msg, amsg);
     if(session.status == OUTOFORDER_RECEIVING)
     {
