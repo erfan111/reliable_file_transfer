@@ -137,7 +137,7 @@ int is_seqnum_in_window(int seq_number)
     }
     else
     {
-        if(seq_number >= session.seq_number_to_send && seq_number < (session.seq_number_to_send + window_size_override))
+        if(seq_number >= session.seq_number_to_send && seq_number < (session.seq_number_to_send + window_size_override+1))
             return 1;
     }
     if(debug_mode)
