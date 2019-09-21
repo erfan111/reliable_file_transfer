@@ -402,6 +402,7 @@ int main(int argc, char** argv)
     {
         debug_mode = atoi(argv[2]);
         window_size_override = atoi(argv[1]);
+        printf("debug mode = %d, window size = %d \n", debug_mode, window_size_override);
     }
 
     sr = socket(AF_INET, SOCK_DGRAM, 0);  /* socket for receiving (udp) */

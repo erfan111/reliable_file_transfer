@@ -323,7 +323,7 @@ int main(int argc, char **argv)
     int                   file_name_size;
     char*                 destination_string;
 
-
+    window_size_override = WINDOW_SIZE;
     if(argc != 4 && argc != 6) {
         printf("Usage: ncp <loss_rate> <source_file> <destination_file>@<comp_name> [window_size_overrride] [debug mode = {1}]\n");
         exit(0);
@@ -347,6 +347,7 @@ int main(int argc, char **argv)
     {
         debug_mode = atoi(argv[4]);
         window_size_override = atoi(argv[5]);
+        printf("debug mode = %d, window size = %d \n", debug_mode, window_size_override);
     }
 
     sr = socket(AF_INET, SOCK_DGRAM, 0);  /* socket for receiving (udp) */
