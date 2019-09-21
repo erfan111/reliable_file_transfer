@@ -345,8 +345,8 @@ int main(int argc, char **argv)
     
     if(argc == 6)
     {
-        debug_mode = atoi(argv[2]);
-        window_size_override = atoi(argv[1]);
+        debug_mode = atoi(argv[4]);
+        window_size_override = atoi(argv[5]);
     }
 
     sr = socket(AF_INET, SOCK_DGRAM, 0);  /* socket for receiving (udp) */
