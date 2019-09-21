@@ -345,8 +345,8 @@ int main(int argc, char **argv)
     
     if(argc == 6)
     {
-        debug_mode = atoi(argv[4]);
-        window_size_override = atoi(argv[5]);
+        debug_mode = atoi(argv[5]);
+        window_size_override = atoi(argv[4]);
         printf("debug mode = %d, window size = %d \n", debug_mode, window_size_override);
     }
 

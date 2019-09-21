@@ -312,29 +312,17 @@ int handle_file_receive(int size, char* buffer)
             printf("DBG: our window is intercepting the 2W\n");
         if(seq_num >= session.window_start_sequence_number || seq_num <= ((session.window_start_sequence_number + window_size_override -1)% window_size_override))
         {
-            if(seq_num >= session.window_start_sequence_number)
-            {
+            int index =  (seq_num - session.window_start_sequence_number + session.window_start_pointer + window_size_override) % (window_size_override);
                 if(debug_mode)
-                    printf("DBG: finding array index path1\n");
-                int index =  seq_num - session.window_start_sequence_number + session.window_start_pointer;
+                    printf("DBG: finding array index = %d \n", index);
                 if(!session.slots[index%window_size_override].valid)
                     insert_into_window(index%window_size_override, buffer, size-2);
-            }
-            else 
-            {
-                int index =  seq_num - session.window_start_sequence_number + session.window_start_pointer;
-                if(debug_mode)
-                    printf("DBG: finding array index path2, index = %d - \n", index);
-                if(!session.slots[index%window_size_override].valid)
-                    insert_into_window(index%window_size_override, buffer, size-2);
-            }
         }
         else
         {
             if(debug_mode)
                 printf("DBG: out of window sequence number\n");
-        }
-            
+        }       
     }
     else    //e.g.:   0 [ 1  2  3  4 ] 5  6  7 
     {
@@ -351,9 +339,7 @@ int handle_file_receive(int size, char* buffer)
             if(debug_mode)
                 printf("DBG: out of window sequence number\n");
         }
-
-    }
-    
+    } 
     return 0;
 }
 
