@@ -35,6 +35,7 @@ typedef struct Session_t {
     unsigned long recent_progress_bytes_receive;
     int socket;
     int last_valid_index;
+    int full_window_received;
 } Session;
 
 void check_order();
@@ -246,6 +247,8 @@ int handle_file_send_request(int size, char* buffer, struct sockaddr_in connecti
 int handle_finalize(char *buffer)
 {
     unsigned long receive_duration;
+    if(session.status == WAITING)
+        return -1;
     if(debug_mode)
         printf("DBG: handling finalize\n");
     fclose(session.file.fw);
@@ -265,36 +268,35 @@ void insert_into_window(int index, char*buffer, int size)
     memcpy( session.slots[index].data, buffer + 5, size);
     session.slots[index].size = size;
     session.slots[index].valid = 1;
+    check_order();
+    if(session.full_window_received)
+        send_feedback_message();
 }
 
 void check_order()
 {
-    int i, saw_invalid = 0;
+    int i, loop_ctr = 0, num_of_valids = 0, saw_invalid = 0;
+    session.full_window_received = 0;
     session.status = INORDER_RECEIVING;
-    for(i=session.window_start_pointer; i<window_size_override;i++) //TODO: only 1 for, use ++i%W
+    for(i=session.window_start_pointer; loop_ctr<window_size_override;i++) //TODO: only 1 for, use ++i%W
     {
+        loop_ctr++;
+        if(i == window_size_override)
+            i = 0;
         if(session.slots[i].valid == 0)
             saw_invalid = 1;
         else
         {
+            num_of_valids++;
             session.last_valid_index = i;
             if(saw_invalid)
                 session.status = OUTOFORDER_RECEIVING;
         }
     }
-    for(i=0; i < session.window_start_pointer;i++)
-    {
-        if(session.slots[i].valid == 0)
-            saw_invalid = 1;
-        else
-        {
-            session.last_valid_index = i;
-            if(saw_invalid)
-                session.status = OUTOFORDER_RECEIVING;
-        }
-    }
+    if(num_of_valids == window_size_override)
+        session.full_window_received = 1;
     if(debug_mode)
-        printf("DBG: checking order session.status = %d\n", session.status);
+        printf("DBG: checking order session.status = %d, full window received = %d\n", session.status, session.full_window_received);
 
 }
 
