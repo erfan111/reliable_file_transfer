@@ -278,7 +278,7 @@ void check_order()
     int i, loop_ctr = 0, num_of_valids = 0, saw_invalid = 0;
     session.full_window_received = 0;
     session.status = INORDER_RECEIVING;
-    for(i=session.window_start_pointer; loop_ctr<window_size_override;i++) //TODO: only 1 for, use ++i%W
+    for(i=session.window_start_pointer; loop_ctr<window_size_override;i++)
     {
         loop_ctr++;
         if(i == window_size_override)

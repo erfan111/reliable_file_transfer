@@ -53,7 +53,7 @@ int send_packet(int type, char * payload, int size)
     message[2] = first;
     message[1] = second;
     memcpy( message + 3, payload, size );
-    usleep(100);
+    usleep(10);
     ret = sendto_dbg( session.socket, message, size+3, 0, 
                 (struct sockaddr *)&session.connection, sizeof(session.connection) );
     if(ret != size+3) 
