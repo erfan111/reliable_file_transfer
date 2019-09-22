@@ -53,7 +53,7 @@ int send_reply(int type, char* payload, int size)
     message[2] = second;
     memcpy( message + 3, payload, size );
    
-    ret = sendto( session.socket, message, size+3, 0, 
+    ret = sendto_dbg( session.socket, message, size+3, 0, 
                     (struct sockaddr *)&session.connection, sizeof(session.connection) );
     if(ret != size+3) 
     {
@@ -383,11 +383,18 @@ int main(int argc, char** argv)
 
     window_size_override = WINDOW_SIZE;
 
-    // optional args
-    if(argc == 3)
+    if(argc != 2 && argc != 4)
     {
-        debug_mode = atoi(argv[2]);
-        window_size_override = atoi(argv[1]);
+        printf("Usage: ./rcv <error_rate> [window_size] [debug_mode] \n");
+        exit(1);
+    }
+    
+    sendto_dbg_init(atoi(argv[1]));
+    // optional args
+    if(argc == 4)
+    {
+        debug_mode = atoi(argv[3]);
+        window_size_override = atoi(argv[2]);
         printf("debug mode = %d, window size = %d \n", debug_mode, window_size_override);
     }
 

@@ -6,7 +6,7 @@ CFLAGS = -g -c -Wall -pedantic
 all: ucast myip file_copy rcv t_rcv t_ncp ncp
 
 t_rcv: t_rcv.o
-	    $(CC) -o t_rcv t_rcv.o  
+	    $(CC) -o t_rcv t_rcv.o
 
 t_ncp: t_ncp.o
 	    $(CC) -o t_ncp t_ncp.o
@@ -20,11 +20,11 @@ myip: myip.o
 file_copy: file_copy.o
 	    $(CC) -o file_copy file_copy.o
 
-rcv: rcv.o
-		$(CC) -o rcv rcv.o
+rcv: rcv.o sendto_dbg.o
+		$(CC) -o rcv rcv.o sendto_dbg.o
 
-ncp: ncp.o
-		$(CC) -o ncp ncp.o
+ncp: ncp.o sendto_dbg.o
+		$(CC) -o ncp ncp.o sendto_dbg.o
 
 clean:
 	rm *.o

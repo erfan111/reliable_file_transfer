@@ -54,7 +54,7 @@ int send_packet(int type, char * payload, int size)
     message[1] = second;
     memcpy( message + 3, payload, size );
     usleep(100);
-    ret = sendto( session.socket, message, size+3, 0, 
+    ret = sendto_dbg( session.socket, message, size+3, 0, 
                 (struct sockaddr *)&session.connection, sizeof(session.connection) );
     if(ret != size+3) 
     {
@@ -341,7 +341,7 @@ int main(int argc, char **argv)
     strncpy(host_name, destination_string, strlen(destination_string));
 
     printf("loss=%d, source = %s, dest = %s, hostname = %s \n", session.loss_rate, session.file.file_name, session.dest_file_name, host_name);
-    
+    sendto_dbg_init(session.loss_rate);
     if(argc == 6)
     {
         debug_mode = atoi(argv[5]);
