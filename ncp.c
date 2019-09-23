@@ -10,7 +10,6 @@ typedef struct Window_slot_t {
     char* data;
     int size;
     int valid;
-    int sent;
 } Window_slot;
 
 typedef struct file_to_transmit_t {
@@ -18,16 +17,12 @@ typedef struct file_to_transmit_t {
     FILE *fr; /* Pointer to source file, which we read  */
     char* file_name;
     int filename_length;
-    int file_size;
-    int file_offset_to_send;
     unsigned long total_bytes_sent;
 } file_to_transmit;
 
 typedef struct Session_t {
     struct sockaddr_in connection;
     Window_slot *slots;
-    int seq_number_to_send;
-    int window_start_pointer;
     enum STATUS status;
     file_to_transmit file;
     struct timeval send_start, send_end;
@@ -39,6 +34,8 @@ typedef struct Session_t {
     int dest_file_name_size;
     int finalize_flag;
     int last_slot_to_send_sequence_number;
+    int window_start_sequence_number;
+    int window_start_pointer;
 } Session;
 
 Session session;
@@ -80,8 +77,8 @@ int send_poll_message()
 int send_finalize_message()
 {
     char message[2];
-    uint8_t second = session.seq_number_to_send & 0x000000ff;
-    uint8_t first = (session.seq_number_to_send >> (8)) & 0x000000ff;
+    uint8_t second = session.window_start_sequence_number & 0x000000ff;
+    uint8_t first = (session.window_start_sequence_number >> (8)) & 0x000000ff;
     printf("DBG: sending finalize message\n");
     message[1] = first;
     message[2] = second;
@@ -101,7 +98,6 @@ int start_sending_the_file()
     {
         session.slots[i].data = malloc(1395);
         session.slots[i].valid = 1;
-        session.slots[i].sent = 1;
         nread = fread(session.slots[i].data, 1, READ_BUF_SIZE, session.file.fr);
         session.slots[i].size = nread;
         second = i & 0x000000ff;
@@ -129,14 +125,14 @@ int start_sending_the_file()
 
 int is_seqnum_in_window(int seq_number)
 {
-    if(session.seq_number_to_send +1 >= window_size_override)  //overlapping
+    if(session.window_start_sequence_number +1 >= window_size_override)  //overlapping
     {
-        if((seq_number >= session.seq_number_to_send && seq_number <= ((2*window_size_override)-1)) || (seq_number <= (session.seq_number_to_send - window_size_override)))
+        if((seq_number >= session.window_start_sequence_number && seq_number <= ((2*window_size_override)-1)) || (seq_number <= (session.window_start_sequence_number - window_size_override)))
             return 1;
     }
     else
     {
-        if(seq_number >= session.seq_number_to_send && seq_number < (session.seq_number_to_send + window_size_override+1))
+        if(seq_number >= session.window_start_sequence_number && seq_number < (session.window_start_sequence_number + window_size_override+1))
             return 1;
     }
     if(debug_mode)
@@ -165,10 +161,10 @@ int handle_acknowledge(int sequence_number)
         int nread, new_seq_num;
         uint8_t first, second;
         char buf[READ_BUF_SIZE+2];
-        while(session.seq_number_to_send != sequence_number && !session.finalize_flag)
+        while(session.window_start_sequence_number != sequence_number && !session.finalize_flag)
         {
             if(debug_mode)
-                printf("DBG: session seqnum = %d, seqnum received = %d, finalize = %d \n", session.seq_number_to_send, sequence_number, session.finalize_flag);
+                printf("DBG: session seqnum = %d, seqnum received = %d, finalize = %d \n", session.window_start_sequence_number, sequence_number, session.finalize_flag);
 
             nread = fread(session.slots[session.window_start_pointer].data, 1, READ_BUF_SIZE, session.file.fr);
             session.slots[session.window_start_pointer].size = nread;
@@ -180,22 +176,22 @@ int handle_acknowledge(int sequence_number)
                     if(debug_mode)
                         printf("DBG: eof reached \n");
                     session.finalize_flag = 1;
-                    session.last_slot_to_send_sequence_number = (session.seq_number_to_send+window_size_override) % (2*window_size_override);
+                    session.last_slot_to_send_sequence_number = (session.window_start_sequence_number+window_size_override) % (2*window_size_override);
                 }
                     
             }
-            new_seq_num = (session.seq_number_to_send+window_size_override) % (2*window_size_override);
+            new_seq_num = (session.window_start_sequence_number+window_size_override) % (2*window_size_override);
             second = new_seq_num & 0x000000ff;
             first = (new_seq_num >> (8)) & 0x000000ff;
             buf[0] = second;
             buf[1] = first;
             memcpy(buf + 2, session.slots[session.window_start_pointer].data, session.slots[session.window_start_pointer].size);
             if(debug_mode)
-                printf("DBG: sending data with seq = %d, our window start is=%d\n", new_seq_num, session.seq_number_to_send);
+                printf("DBG: sending data with seq = %d, our window start is=%d\n", new_seq_num, session.window_start_sequence_number);
             send_packet(2, buf, session.slots[session.window_start_pointer].size+2);
 
             
-            session.seq_number_to_send = (session.seq_number_to_send +1) % (2*window_size_override);
+            session.window_start_sequence_number = (session.window_start_sequence_number +1) % (2*window_size_override);
             session.window_start_pointer = (session.window_start_pointer+1) % window_size_override;
 
             session.file.total_bytes_sent += nread;
@@ -224,9 +220,9 @@ int handle_nacknowledge(int sequence_number)
         uint8_t first, second;
         char buf[READ_BUF_SIZE+2];
         int index;
-        if(sequence_number < session.seq_number_to_send)
+        if(sequence_number < session.window_start_sequence_number)
             sequence_number += (2*window_size_override);
-        index = ((sequence_number - session.seq_number_to_send) + session.window_start_pointer) % window_size_override;
+        index = ((sequence_number - session.window_start_sequence_number) + session.window_start_pointer) % window_size_override;
         second = sequence_number & 0x000000ff;
         first = (sequence_number >> (8)) & 0x000000ff;
         buf[0] = second;
@@ -268,7 +264,7 @@ int parse_feedback_message(char * buffer, int size)
 int parse(char *buffer, int size)
 {
     int type = buffer[0];
-    if(type == 3)
+    if(type == FEEDBACK_MSG)
     {
         switch (session.status)
         {
@@ -284,7 +280,7 @@ int parse(char *buffer, int size)
             break;
         }
     }
-    else if(type == 1)
+    else if(type == FINALIZE_MSG)
     {
         unsigned long send_duration;
         gettimeofday(&session.send_end, NULL);
@@ -292,12 +288,17 @@ int parse(char *buffer, int size)
         printf("Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_sent/1048576, send_duration/1000, (session.file.total_bytes_sent*8)/send_duration);
         exit(0);
     }
+    else if(type == WAIT_MSG)
+    {
+        sleep(5);
+        return 0;
+    }
     else
     {
         fprintf(stderr, "Wrong msg type\n");
     }
     
-    return 0;
+    return 1;
 }
 
 int main(int argc, char **argv)
@@ -382,7 +383,7 @@ int main(int argc, char **argv)
     session.connection = send_addr;
     session.status = STARTING;
     session.window_start_pointer = 0;
-    session.seq_number_to_send = 0;
+    session.window_start_sequence_number = 0;
     gettimeofday(&session.recent_progress_start_timestamp, NULL);
     gettimeofday(&session.send_start, NULL);
     
@@ -420,7 +421,7 @@ int main(int argc, char **argv)
             switch(session.status)
             {
                 case STARTING:
-                send_initialize_request();
+                    send_initialize_request();
                     break;
                 case SENDING:
                     send_poll_message();

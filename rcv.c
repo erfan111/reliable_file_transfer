@@ -10,24 +10,18 @@ typedef struct Window_slot_t {
     char data[1395];
     int size;
     int valid;
-    int nack_sent;
 } Window_slot;
 
 typedef struct file_to_transmit_t {
     int fd;
     FILE *fw; /* Pointer to dest file, which we write  */
     char* file_name;
-    int filename_length;
-    int file_size;
-    int file_offset_to_receive;
-    unsigned long total_bytes_receive;
+    unsigned long total_bytes_received;
 } file_to_transmit;
 
 typedef struct Session_t {
     struct sockaddr_in connection;
     Window_slot *slots;
-    int window_start_sequence_number;
-    int window_start_pointer;
     enum STATUS status;
     file_to_transmit file;
     struct timeval receive_start, receive_end;
@@ -36,6 +30,8 @@ typedef struct Session_t {
     int socket;
     int last_valid_index;
     int full_window_received;
+    int window_start_sequence_number;
+    int window_start_pointer;
 } Session;
 
 void check_order();
@@ -81,7 +77,7 @@ int send_feedback_message() // TODO: call it when window is completely received
                 exit(0);
             }
 
-            session.file.total_bytes_receive += nwritten;
+            session.file.total_bytes_received += nwritten;
             session.recent_progress_bytes_receive += nwritten;
             if(session.recent_progress_bytes_receive >= 104857600)
             {
@@ -89,7 +85,7 @@ int send_feedback_message() // TODO: call it when window is completely received
                 gettimeofday(&session.recent_progress_end_timestamp, NULL);
                 receive_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
                 
-                printf("Reporting: Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_receive/(1048576), receive_duration/1000, (session.recent_progress_bytes_receive*8)/receive_duration);
+                printf("Reporting: Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_received/(1048576), receive_duration/1000, (session.recent_progress_bytes_receive*8)/receive_duration);
                 gettimeofday(&session.recent_progress_start_timestamp, NULL);
                 session.recent_progress_bytes_receive = 0;
             }
@@ -115,7 +111,7 @@ int send_feedback_message() // TODO: call it when window is completely received
                 printf("An error occurred when writing to file...\n");
                 exit(0);
             }
-            session.file.total_bytes_receive += nwritten;
+            session.file.total_bytes_received += nwritten;
             session.recent_progress_bytes_receive += nwritten;
             if(session.recent_progress_bytes_receive >= 104857600)
             {
@@ -123,7 +119,7 @@ int send_feedback_message() // TODO: call it when window is completely received
                 gettimeofday(&session.recent_progress_end_timestamp, NULL);
                 receive_duration = (session.recent_progress_end_timestamp.tv_sec - session.recent_progress_start_timestamp.tv_sec)*1000000 + (session.recent_progress_end_timestamp.tv_usec - session.recent_progress_start_timestamp.tv_usec);
                 
-                printf("Reporting: Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_receive/1048576, receive_duration/1000, (session.recent_progress_bytes_receive*8)/receive_duration);
+                printf("Reporting: Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_received/1048576, receive_duration/1000, (session.recent_progress_bytes_receive*8)/receive_duration);
                 gettimeofday(&session.recent_progress_start_timestamp, NULL);
                 session.recent_progress_bytes_receive = 0;
             }
@@ -217,16 +213,32 @@ u_int16_t get_payload_size(char *buffer)
     return size;
 }
 
-int handle_file_send_request(int size, char* buffer, struct sockaddr_in connection)
+void reset_session()
 {
-    if(debug_mode)
-        printf("DBG: handling file send request\n");
     gettimeofday(&session.receive_start, NULL);
     gettimeofday(&session.recent_progress_start_timestamp, NULL);
     session.window_start_sequence_number = 0;
     session.status = INORDER_RECEIVING;
-    session.connection = connection;
     session.window_start_pointer = 0;
+    session.full_window_received = 0;
+    session.last_valid_index = 0;
+    session.recent_progress_bytes_receive = 0;
+    session.file.total_bytes_received = 0;
+}
+
+int handle_file_send_request(int size, char* buffer, struct sockaddr_in connection)
+{
+    if(debug_mode)
+        printf("DBG: handling file send request\n");
+    if(session.status != WAITING)
+    {
+        send_reply(5, NULL, 0); // reply and request the sender to wait for a few seconds
+        return 0;
+    }
+
+    reset_session();
+    
+    session.connection = connection;
     session.file.file_name = get_payload(buffer, size);
     
     printf("Receiving file name is %s\n", session.file.file_name);
@@ -236,12 +248,9 @@ int handle_file_send_request(int size, char* buffer, struct sockaddr_in connecti
     }
     int i = window_size_override;
     for(i=0; i < window_size_override; i++)
-    {
         session.slots[i].valid = 0;
-        session.slots[i].nack_sent = 0;
-    }
     send_feedback_message(); // look at the window and send the feedback
-    return 0;
+    return 1;
 }
 
 int handle_finalize(char *buffer)
@@ -253,7 +262,7 @@ int handle_finalize(char *buffer)
         printf("DBG: handling finalize\n");
     gettimeofday(&session.receive_end, NULL);
     receive_duration = (session.receive_end.tv_sec - session.receive_start.tv_sec)*1000000 + (session.receive_end.tv_usec - session.receive_start.tv_usec);
-    printf("Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_receive/1048576, receive_duration/1000, (session.file.total_bytes_receive*8)/receive_duration);
+    printf("Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_received/1048576, receive_duration/1000, (session.file.total_bytes_received*8)/receive_duration);
 
     send_finalize_message();
     fclose(session.file.fw);
@@ -350,18 +359,21 @@ int parse(char* buffer, int length, struct sockaddr_in connection)
     int type = buffer[0];
     int payload_size, file_name_size;
     switch(type){
-        case 0:
+        case FILE_SEND_REQUEST_MSG:
             printf("DBG: message type is file transfer initialization\n");
             file_name_size = get_payload_size(buffer);
             handle_file_send_request(file_name_size, buffer, connection);
             break;
-        case 1:
+        case FINALIZE_MSG:
             printf("DBG: message type is finalize\n");
             handle_finalize(buffer);
             break;
-        case 2:
+        case DATA_MSG:
             payload_size = get_payload_size(buffer);
             handle_file_receive(payload_size, buffer);
+            break;
+        case FEEDBACK_MSG:
+            send_feedback_message();
             break;
         default:
             fprintf(stderr, "invalid message type ...\n");
