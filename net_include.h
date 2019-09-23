@@ -20,7 +20,7 @@
 
 #define MAX_MESS_LEN 1400
 
-#define WINDOW_SIZE 100
+#define WINDOW_SIZE 500
 
 enum STATUS {
     WAITING,

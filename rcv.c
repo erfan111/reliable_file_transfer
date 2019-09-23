@@ -251,13 +251,13 @@ int handle_finalize(char *buffer)
         return -1;
     if(debug_mode)
         printf("DBG: handling finalize\n");
-    fclose(session.file.fw);
-    session.status = WAITING;
     gettimeofday(&session.receive_end, NULL);
     receive_duration = (session.receive_end.tv_sec - session.receive_start.tv_sec)*1000000 + (session.receive_end.tv_usec - session.receive_start.tv_usec);
     printf("Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_receive/1048576, receive_duration/1000, (session.file.total_bytes_receive*8)/receive_duration);
 
     send_finalize_message();
+    fclose(session.file.fw);
+    session.status = WAITING;
     return 0;
 }
 
@@ -427,7 +427,7 @@ int main(int argc, char** argv)
     {
         read_mask = mask;
         timeout.tv_sec = 0;
-        timeout.tv_usec = 1000;
+        timeout.tv_usec = 800;
         num = select( FD_SETSIZE, &read_mask, &write_mask, &excep_mask, &timeout);
         if (num > 0) {
             if ( FD_ISSET( sr, &read_mask) ) {
