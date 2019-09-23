@@ -261,6 +261,15 @@ int parse_feedback_message(char * buffer, int size)
 
 }
 
+void close_the_session()
+{
+    unsigned long send_duration;
+    gettimeofday(&session.send_end, NULL);
+    send_duration = (session.send_end.tv_sec - session.send_start.tv_sec)*1000000 + (session.send_end.tv_usec - session.send_start.tv_usec);
+    printf("Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_sent/1048576, send_duration/1000, (session.file.total_bytes_sent*8)/send_duration);
+    exit(0);
+}
+
 int parse(char *buffer, int size)
 {
     int type = buffer[0];
@@ -281,22 +290,11 @@ int parse(char *buffer, int size)
         }
     }
     else if(type == FINALIZE_MSG)
-    {
-        unsigned long send_duration;
-        gettimeofday(&session.send_end, NULL);
-        send_duration = (session.send_end.tv_sec - session.send_start.tv_sec)*1000000 + (session.send_end.tv_usec - session.send_start.tv_usec);
-        printf("Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_sent/1048576, send_duration/1000, (session.file.total_bytes_sent*8)/send_duration);
-        exit(0);
-    }
+        close_the_session();
     else if(type == WAIT_MSG)
-    {
         sleep(5);
-        return 0;
-    }
     else
-    {
         fprintf(stderr, "Wrong msg type\n");
-    }
     
     return 1;
 }
@@ -321,6 +319,7 @@ int main(int argc, char **argv)
     char                  delim[] = "@";
     int                   file_name_size;
     char*                 destination_string;
+    int                   retry_count = 0;
 
     window_size_override = WINDOW_SIZE;
     if(argc != 4 && argc != 6) {
@@ -427,6 +426,9 @@ int main(int argc, char **argv)
                     send_poll_message();
                     break;
                 case FINALIZING:
+                    retry_count++;
+                    if(retry_count == 10)
+                        close_the_session();
                     send_finalize_message();
                     break;
                 default:
