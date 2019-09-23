@@ -256,17 +256,17 @@ int handle_file_send_request(int size, char* buffer, struct sockaddr_in connecti
 int handle_finalize(char *buffer)
 {
     unsigned long receive_duration;
-    if(session.status == WAITING)
-        return -1;
+
     if(debug_mode)
         printf("DBG: handling finalize\n");
-    gettimeofday(&session.receive_end, NULL);
-    receive_duration = (session.receive_end.tv_sec - session.receive_start.tv_sec)*1000000 + (session.receive_end.tv_usec - session.receive_start.tv_usec);
-    printf("Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_received/1048576, receive_duration/1000, (session.file.total_bytes_received*8)/receive_duration);
-
     send_finalize_message();
-    fclose(session.file.fw);
-    session.status = WAITING;
+    if(session.status != WAITING){
+        gettimeofday(&session.receive_end, NULL);
+        receive_duration = (session.receive_end.tv_sec - session.receive_start.tv_sec)*1000000 + (session.receive_end.tv_usec - session.receive_start.tv_usec);
+        printf("Total Bytes = %luMB , Total Time = %lu MSecs, Average Transfer Rate = %luMbPS \n", session.file.total_bytes_received/1048576, receive_duration/1000, (session.file.total_bytes_received*8)/receive_duration);
+        fclose(session.file.fw);
+        session.status = WAITING;
+    }
     return 0;
 }
 
