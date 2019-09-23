@@ -319,7 +319,6 @@ int main(int argc, char **argv)
     char                  delim[] = "@";
     int                   file_name_size;
     char*                 destination_string;
-    int                   retry_count = 0;
 
     window_size_override = WINDOW_SIZE;
     if(argc != 4 && argc != 6) {
@@ -426,9 +425,6 @@ int main(int argc, char **argv)
                     send_poll_message();
                     break;
                 case FINALIZING:
-                    retry_count++;
-                    if(retry_count == 10)
-                        close_the_session();
                     send_finalize_message();
                     break;
                 default:
